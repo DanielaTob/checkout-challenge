@@ -60,7 +60,7 @@ jobs:
             echo "## Coverage"
             for pkg in backend frontend; do
               f="$pkg/coverage/coverage-summary.json"
-              [ -f "$f" ] && node -e "const t=require('./$f').total;console.log('**$pkg**: lines '+t.lines.pct+'% · branches '+t.branches.pct+'% · functions '+t.functions.pct+'% · statements '+t.statements.pct+'%')"
+              if [ -f "$f" ]; then node -e "const t=require('./$f').total;console.log('**$pkg**: lines '+t.lines.pct+'% · branches '+t.branches.pct+'% · functions '+t.functions.pct+'% · statements '+t.statements.pct+'%')"; else echo "**$pkg**: sin datos (verify falló antes de la cobertura)"; fi
             done
             echo; echo "## Trazabilidad"; cat trace.md 2>/dev/null
           } >> "$GITHUB_STEP_SUMMARY"

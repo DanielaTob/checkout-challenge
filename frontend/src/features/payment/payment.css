@@ -1,0 +1,104 @@
+/* Material-style bottom sheet over a dimmed backdrop (screen 3). */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(15 20 35 / 0.55);
+  animation: backdrop-in 160ms ease-out;
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 92dvh;
+  overflow-y: auto;
+  padding: 8px var(--space) calc(var(--space) + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  background: var(--color-surface);
+  box-shadow: 0 -8px 24px rgb(15 20 35 / 0.18);
+  animation: sheet-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sheet__handle {
+  align-self: center;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: #c9cfdc;
+}
+
+.sheet__title {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.sheet__product {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+.sheet__product .product-card__image {
+  border-radius: 10px;
+}
+.sheet__product-name {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sheet__muted {
+  margin: 4px 0 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+.breakdown__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.breakdown__row dt { color: var(--color-muted); }
+.breakdown__row dd { margin: 0; font-variant-numeric: tabular-nums; }
+.breakdown__row--total {
+  padding-top: 8px;
+  border-top: 1px solid #e3e6ee;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+.breakdown__row--total dt { color: var(--color-text); }
+
+.sheet__card { margin: 0; }
+.masked-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet, .sheet-backdrop { animation: none; }
+}
+@media (min-width: 600px) {
+  .sheet-backdrop { align-items: center; }
+  .sheet { border-radius: 20px; }
+}

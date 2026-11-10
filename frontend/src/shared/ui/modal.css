@@ -1,3 +1,4 @@
+/* Screen 2: full-height sheet on phones (internal scroll, sticky footer), centered card on desktop. */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -5,16 +6,18 @@
   display: flex;
   align-items: stretch;
   justify-content: center;
-  background: rgb(15 20 35 / 0.55);
+  background: rgb(17 17 17 / 0.45);
+  animation: overlay-in var(--dur) var(--ease);
 }
 
 .modal {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   height: 100dvh;
   background: var(--color-bg);
+  animation: modal-in 200ms var(--ease);
 }
 
 .modal__header {
@@ -22,49 +25,81 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px var(--space);
-  background: var(--color-surface);
-  border-bottom: 1px solid #e3e6ee;
+  padding: 14px var(--space);
+  background: var(--color-bg);
 }
 
 .modal__title {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
 }
 
 .modal__close {
+  display: grid;
+  place-items: center;
   width: 44px;
   height: 44px;
-  border: 0;
+  border: 1px solid var(--color-border);
   border-radius: 50%;
-  background: transparent;
-  font-size: 1.25rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1.125rem;
   cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+.modal__close:hover {
+  background: var(--color-surface-muted);
 }
 .modal__close:focus-visible {
-  outline: 3px solid var(--color-primary);
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 /* Scrolls internally so the footer button stays reachable with the keyboard open (375×667). */
 .modal__body {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space);
+  padding: 4px var(--space) var(--space);
   overscroll-behavior: contain;
 }
 
 .modal__footer {
   padding: 12px var(--space) calc(12px + env(safe-area-inset-bottom));
   background: var(--color-surface);
-  border-top: 1px solid #e3e6ee;
+  border-top: 1px solid var(--color-border);
 }
 
-@media (min-width: 600px) {
-  .modal-overlay { align-items: center; }
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@media (min-width: 640px) {
+  .modal-overlay {
+    align-items: center;
+    padding: 24px;
+  }
   .modal {
     height: auto;
-    max-height: 90dvh;
-    border-radius: var(--radius);
+    max-height: min(860px, calc(100dvh - 48px));
     overflow: hidden;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 64px rgb(17 17 17 / 0.18);
+  }
+  .modal__header {
+    padding: 18px 24px 8px;
+  }
+  .modal__body {
+    padding: 8px 24px 20px;
+  }
+  .modal__footer {
+    padding: 14px 24px 18px;
   }
 }

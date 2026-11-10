@@ -6,7 +6,7 @@
 - [x] T3 — `validateCard` en dominio y `integritySignature` (AC-004-05, AC-004-06)
 - [x] T4 — Adaptador HTTP de la pasarela con timeouts y mapeo de errores (AC-004-07, AC-004-13)
 - [x] T5 — Repositorio de transacciones: `createPendingIfStock` con bloqueo de fila (AC-004-03, AC-004-21)
-- [ ] T5b — Repositorio de transacciones: `applyResult` atómico e idempotente, ERROR por stock solo en la carrera (AC-004-09, AC-004-10, AC-004-11, AC-004-12)
+- [x] T5b — Repositorio de transacciones: `applyResult` atómico e idempotente, ERROR por stock solo en la carrera (AC-004-09, AC-004-10, AC-004-11, AC-004-12)
 - [ ] T6 — `CreateTransaction` + `PollTransactionStatus` (AC-004-02, AC-004-03, AC-004-04, AC-004-08, AC-004-13)
 - [ ] T7 — `TransactionsController` (POST/GET) + DTOs + Swagger (AC-004-02, AC-004-05, AC-004-14)
 - [ ] T8 — `GetDelivery` + controlador (AC-004-15)

@@ -174,3 +174,113 @@ describe('PrismaTransactionRepository reads', () => {
     expect(parseShipping({ ...shipping, city: 1 })).toBeNull();
   });
 });
+
+describe('PrismaTransactionRepository.applyResult', () => {
+  const id = aRow().id;
+  const approved = {
+    status: 'APPROVED' as const,
+    gatewayTransactionId: 'gw-1',
+    failureReason: null,
+  };
+
+  it('AC-004-09 APPROVED: in one DB transaction updates the status, decrements stock by quantity and creates a PENDING delivery', async () => {
+    const { tx, prisma, repo } = makePrisma();
+    tx.transaction.updateMany.mockResolvedValue({ count: 1 });
+    tx.transaction.findUniqueOrThrow
+      .mockResolvedValueOnce(aRow({ status: 'APPROVED' }))
+      .mockResolvedValueOnce(aRow({ status: 'APPROVED' }));
+    tx.product.updateMany.mockResolvedValue({ count: 1 });
+
+    await repo.applyResult(id, approved);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.transaction.updateMany).toHaveBeenCalledWith({
+      where: { id, status: 'PENDING' },
+      data: {
+        status: 'APPROVED',
+        failureReason: null,
+        gatewayTransactionId: 'gw-1',
+      },
+    });
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: { id: productId, stock: { gte: 2 } },
+      data: { stock: { decrement: 2 } },
+    });
+    expect(tx.delivery.create).toHaveBeenCalledWith({
+      data: { transactionId: id, customerId: newTx.customerId, ...shipping },
+    });
+  });
+
+  it.each(['DECLINED', 'ERROR'] as const)(
+    'AC-004-10 %s: stores the status and reason, no delivery and no stock change',
+    async (status) => {
+      const { tx, repo } = makePrisma();
+      tx.transaction.updateMany.mockResolvedValue({ count: 1 });
+      tx.transaction.findUniqueOrThrow.mockResolvedValue(
+        aRow({ status, failureReason: 'rejected' }),
+      );
+      const t = await repo.applyResult(id, {
+        status,
+        gatewayTransactionId: null,
+        failureReason: 'rejected',
+      });
+      expect(tx.transaction.updateMany).toHaveBeenCalledWith({
+        where: { id, status: 'PENDING' },
+        data: { status, failureReason: 'rejected' },
+      });
+      expect(tx.product.updateMany).not.toHaveBeenCalled();
+      expect(tx.delivery.create).not.toHaveBeenCalled();
+      expect(t.status).toBe(status);
+    },
+  );
+
+  it('AC-004-11 applying an already applied result (0 rows claimed) does not touch stock nor create a second delivery', async () => {
+    const { tx, repo } = makePrisma();
+    tx.transaction.updateMany.mockResolvedValue({ count: 0 });
+    tx.transaction.findUniqueOrThrow.mockResolvedValue(
+      aRow({ status: 'APPROVED' }),
+    );
+    const t = await repo.applyResult(id, approved);
+    expect(tx.product.updateMany).not.toHaveBeenCalled();
+    expect(tx.delivery.create).not.toHaveBeenCalled();
+    expect(t.status).toBe('APPROVED');
+  });
+
+  it('AC-004-12 APPROVED but the stock ran out during the payment: stock never below 0, no delivery, ERROR with OUT_OF_STOCK_AFTER_PAYMENT', async () => {
+    const { tx, repo } = makePrisma();
+    tx.transaction.updateMany.mockResolvedValue({ count: 1 });
+    tx.transaction.findUniqueOrThrow
+      .mockResolvedValueOnce(aRow({ status: 'APPROVED' }))
+      .mockResolvedValueOnce(
+        aRow({
+          status: 'ERROR',
+          failureReason: 'OUT_OF_STOCK_AFTER_PAYMENT',
+        }),
+      );
+    tx.product.updateMany.mockResolvedValue({ count: 0 });
+
+    const t = await repo.applyResult(id, approved);
+
+    expect(tx.transaction.update).toHaveBeenCalledWith({
+      where: { id },
+      data: { status: 'ERROR', failureReason: 'OUT_OF_STOCK_AFTER_PAYMENT' },
+    });
+    expect(tx.delivery.create).not.toHaveBeenCalled();
+    expect(t).toMatchObject({
+      status: 'ERROR',
+      failureReason: 'OUT_OF_STOCK_AFTER_PAYMENT',
+    });
+  });
+
+  it('AC-004-09 throws (rolling back) if an approved transaction has no shipping stored', async () => {
+    const { tx, repo } = makePrisma();
+    tx.transaction.updateMany.mockResolvedValue({ count: 1 });
+    tx.transaction.findUniqueOrThrow.mockResolvedValue(
+      aRow({ shipping: null }),
+    );
+    await expect(repo.applyResult(id, approved)).rejects.toThrow(
+      'has no shipping',
+    );
+    expect(tx.product.updateMany).not.toHaveBeenCalled();
+  });
+});

@@ -6,9 +6,11 @@ import {
   type DomainError,
 } from '../../domain/shared/domain-error';
 import { err, ok, type Result } from '../../domain/shared/result';
-import type {
-  NewTransaction,
-  Transaction,
+import {
+  OUT_OF_STOCK_AFTER_PAYMENT,
+  type NewTransaction,
+  type Transaction,
+  type TransactionOutcome,
 } from '../../domain/transaction/transaction';
 import type { TransactionRepository } from '../../domain/transaction/transaction.repository';
 import type {
@@ -139,5 +141,55 @@ export class PrismaTransactionRepository implements TransactionRepository {
       include,
     });
     return toDomain(row);
+  }
+
+  async applyResult(
+    id: string,
+    outcome: TransactionOutcome,
+  ): Promise<Transaction> {
+    return this.prisma.$transaction(async (tx) => {
+      // Claim: only one caller can move the row out of PENDING (row lock + re-check).
+      const claimed = await tx.transaction.updateMany({
+        where: { id, status: 'PENDING' },
+        data: {
+          status: outcome.status,
+          failureReason: outcome.failureReason,
+          ...(outcome.gatewayTransactionId
+            ? { gatewayTransactionId: outcome.gatewayTransactionId }
+            : {}),
+        },
+      });
+      if (claimed.count === 1 && outcome.status === 'APPROVED') {
+        const row = await tx.transaction.findUniqueOrThrow({ where: { id } });
+        const shipping = parseShipping(row.shipping);
+        // Invariant: shipping is stored at creation. Throwing rolls the claim back.
+        if (!shipping) throw new Error(`Transaction ${id} has no shipping`);
+        const decremented = await tx.product.updateMany({
+          where: { id: row.productId, stock: { gte: row.quantity } },
+          data: { stock: { decrement: row.quantity } },
+        });
+        if (decremented.count === 0) {
+          // Another payment took the last units while this one was in flight.
+          await tx.transaction.update({
+            where: { id },
+            data: {
+              status: 'ERROR',
+              failureReason: OUT_OF_STOCK_AFTER_PAYMENT,
+            },
+          });
+        } else {
+          await tx.delivery.create({
+            data: {
+              transactionId: id,
+              customerId: row.customerId,
+              ...shipping,
+            },
+          });
+        }
+      }
+      return toDomain(
+        await tx.transaction.findUniqueOrThrow({ where: { id }, include }),
+      );
+    });
   }
 }

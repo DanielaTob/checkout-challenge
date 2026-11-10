@@ -1,6 +1,10 @@
 import type { DomainError } from '../shared/domain-error';
 import type { Result } from '../shared/result';
-import type { NewTransaction, Transaction } from './transaction';
+import type {
+  NewTransaction,
+  Transaction,
+  TransactionOutcome,
+} from './transaction';
 
 export interface TransactionRepository {
   /**
@@ -15,6 +19,12 @@ export interface TransactionRepository {
   findById(id: string): Promise<Transaction | null>;
   findByIdempotencyKey(key: string): Promise<Transaction | null>;
   markGatewayId(id: string, gatewayTransactionId: string): Promise<Transaction>;
+  /**
+   * Atomic and idempotent: only a PENDING transaction changes. APPROVED decrements the
+   * stock (never below 0) and creates the delivery; if the stock ran out meanwhile the
+   * transaction ends in ERROR with OUT_OF_STOCK_AFTER_PAYMENT. Applying twice is a no-op.
+   */
+  applyResult(id: string, outcome: TransactionOutcome): Promise<Transaction>;
 }
 
 export const TRANSACTION_REPOSITORY = Symbol('TransactionRepository');

@@ -9,7 +9,7 @@
 - [x] T5b — Repositorio de transacciones: `applyResult` atómico e idempotente, ERROR por stock solo en la carrera (AC-004-09, AC-004-10, AC-004-11, AC-004-12)
 - [x] T6 — `CreateTransaction` + `PollTransactionStatus` (AC-004-02, AC-004-03, AC-004-04, AC-004-08, AC-004-13)
 - [x] T7 — `TransactionsController` (POST/GET) + DTOs + Swagger (AC-004-02, AC-004-05, AC-004-14)
-- [ ] T8 — `GetDelivery` + controlador (AC-004-15)
+- [x] T8 — `GetDelivery` + controlador (AC-004-15)
 - [ ] T9 — Test de no fuga de datos de tarjeta (AC-004-16)
 - [ ] T10 — Front: `paymentSlice` + thunks `payTransaction` / `pollTransaction` (AC-004-18, AC-004-20)
 - [ ] T11 — Front: `ResultScreen` y Volver a la tienda (AC-004-17, AC-004-19)

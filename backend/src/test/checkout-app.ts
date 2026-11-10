@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { App } from 'supertest/types';
 import { configureApp } from '../configure-app';
+import { DELIVERY_REPOSITORY } from '../domain/delivery/delivery.repository';
 import { CUSTOMER_REPOSITORY } from '../domain/customer/customer.repository';
 import { PAYMENT_GATEWAY } from '../domain/payment/payment-gateway';
 import { PRODUCT_REPOSITORY } from '../domain/product/product.repository';
@@ -29,6 +30,8 @@ export const bootCheckoutApp = async (stock = 5) => {
     .useValue(f.fees)
     .overrideProvider(CLOCK)
     .useValue(f.clock)
+    .overrideProvider(DELIVERY_REPOSITORY)
+    .useValue(f.transactions.deliveries)
     .compile();
   const app: INestApplication<App> = moduleRef.createNestApplication();
   configureApp(app, undefined);

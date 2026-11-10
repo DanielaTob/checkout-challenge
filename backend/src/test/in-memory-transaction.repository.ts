@@ -1,4 +1,5 @@
 import type { Delivery } from '../domain/delivery/delivery';
+import type { DeliveryRepository } from '../domain/delivery/delivery.repository';
 import { domainError, type DomainError } from '../domain/shared/domain-error';
 import { err, ok, type Result } from '../domain/shared/result';
 import {
@@ -18,6 +19,13 @@ export class InMemoryTransactionRepository implements TransactionRepository {
   readonly rows: Transaction[] = [];
   readonly log: string[] = [];
   private seq = 0;
+  /** DeliveryRepository view over the same rows. */
+  readonly deliveries: DeliveryRepository = {
+    findById: (id) =>
+      Promise.resolve(
+        this.rows.find((r) => r.delivery?.id === id)?.delivery ?? null,
+      ),
+  };
 
   constructor(private readonly products: InMemoryProductRepository) {}
 
@@ -107,12 +115,6 @@ export class InMemoryTransactionRepository implements TransactionRepository {
         gatewayTransactionId,
         delivery,
       }),
-    );
-  }
-
-  findDelivery(id: string): Promise<Delivery | null> {
-    return Promise.resolve(
-      this.rows.find((r) => r.delivery?.id === id)?.delivery ?? null,
     );
   }
 

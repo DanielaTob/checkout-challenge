@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GetDelivery } from '../application/deliveries/get-delivery.use-case';
 import { ApplyTransactionResult } from '../application/transactions/apply-transaction-result.use-case';
 import { CreateTransaction } from '../application/transactions/create-transaction.use-case';
 import { GetTransaction } from '../application/transactions/get-transaction.use-case';
@@ -9,6 +10,10 @@ import {
   CUSTOMER_REPOSITORY,
   type CustomerRepository,
 } from '../domain/customer/customer.repository';
+import {
+  DELIVERY_REPOSITORY,
+  type DeliveryRepository,
+} from '../domain/delivery/delivery.repository';
 import {
   PAYMENT_GATEWAY,
   type PaymentGateway,
@@ -26,16 +31,24 @@ import {
 import { CustomersModule } from './customers.module';
 import { gatewayConfigFrom } from './gateway/gateway-config';
 import { HttpPaymentGateway } from './gateway/http-payment-gateway';
+import { DeliveriesController } from './http/deliveries.controller';
 import { TransactionsController } from './http/transactions.controller';
+import { PrismaDeliveryRepository } from './prisma/prisma-delivery.repository';
 import { PrismaTransactionRepository } from './prisma/prisma-transaction.repository';
 import { ProductsModule } from './products.module';
 
 /** Wires transactions and deliveries: ports → adapters, use cases built by factory. */
 @Module({
   imports: [ProductsModule, CustomersModule],
-  controllers: [TransactionsController],
+  controllers: [TransactionsController, DeliveriesController],
   providers: [
     { provide: TRANSACTION_REPOSITORY, useClass: PrismaTransactionRepository },
+    { provide: DELIVERY_REPOSITORY, useClass: PrismaDeliveryRepository },
+    {
+      provide: GetDelivery,
+      useFactory: (repo: DeliveryRepository) => new GetDelivery(repo),
+      inject: [DELIVERY_REPOSITORY],
+    },
     {
       provide: PAYMENT_GATEWAY,
       useFactory: (config: ConfigService) =>

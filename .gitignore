@@ -1,0 +1,20 @@
+# deps / builds
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.serverless/
+.aws-sam/
+lambda.zip
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# misc
+.DS_Store
+*.log
+.idea/
+.vscode/

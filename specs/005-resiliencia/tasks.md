@@ -7,5 +7,5 @@
 - [x] T3c — Backend: presupuesto de ~10 s para refrescar desde la pasarela en `GET /transactions/:id` y `by-key` (AC-005-15)
 - [x] T4 — Front: `persistConfig` con versión y migración (AC-005-07, AC-005-08)
 - [x] T5 — Front: `StepRouter` de rehidratación por paso (AC-005-01, AC-005-02, AC-005-03, AC-005-04)
-- [ ] T6 — Front: pago en vuelo con `idempotencyKey` persistida (AC-005-05)
+- [x] T6 — Front: pago en vuelo con `idempotencyKey` persistida (AC-005-05)
 - [ ] T7 — Front: test de no fuga en `localStorage` en todo el flujo (AC-005-06)

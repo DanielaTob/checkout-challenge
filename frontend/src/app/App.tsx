@@ -9,7 +9,7 @@ import { useAppDispatch, useAppSelector } from './hooks';
 import { resumeAfterReload } from './resumeAfterReload';
 import './app.css';
 
-export const STORE_NAME = 'Ceiba Shop';
+export const STORE_NAME = 'Tienda Demo';
 
 export function App() {
   const dispatch = useAppDispatch();

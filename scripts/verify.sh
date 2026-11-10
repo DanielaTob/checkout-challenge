@@ -34,8 +34,15 @@ secrets_scan() {
   if [[ "$FAST" == "1" ]]; then
     gitleaks git --staged --pre-commit --redact --no-banner .
   else
-    gitleaks git --redact --no-banner . && gitleaks dir --redact --no-banner \
-      $(git ls-files --cached --others --exclude-standard)
+    # `gitleaks dir` takes a single path, so copy only what git would track (tracked +
+    # untracked-not-ignored) to a temp dir. Ignored files like backend/.env are never scanned.
+    local tmp rc
+    tmp="$(mktemp -d)"
+    git ls-files -z --cached --others --exclude-standard | tar --null -T - -cf - | tar -xf - -C "$tmp"
+    gitleaks git --redact --no-banner . && gitleaks dir --redact --no-banner "$tmp"
+    rc=$?
+    rm -rf "$tmp"
+    return $rc
   fi
 }
 run "secrets scan (gitleaks)" secrets_scan

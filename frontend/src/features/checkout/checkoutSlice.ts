@@ -46,6 +46,9 @@ const checkoutSlice = createSlice({
       state.step = 'product';
       state.card = null;
     },
+    setQuantity(state, action: PayloadAction<number>) {
+      state.quantity = action.payload;
+    },
     goToStep(state, action: PayloadAction<CheckoutStep>) {
       state.step = action.payload;
     },
@@ -53,5 +56,6 @@ const checkoutSlice = createSlice({
   },
 });
 
-export const { startCheckout, saveDetails, closeCheckout, goToStep, resetCheckout } = checkoutSlice.actions;
+export const { startCheckout, saveDetails, closeCheckout, setQuantity, goToStep, resetCheckout } =
+  checkoutSlice.actions;
 export const checkoutReducer = checkoutSlice.reducer;

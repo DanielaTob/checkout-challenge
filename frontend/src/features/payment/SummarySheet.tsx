@@ -2,7 +2,9 @@ import { useEffect, useId } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { formatCop } from '../../shared/utils/money';
 import { ProductImage } from '../product/ProductImage';
+import { setQuantity } from '../checkout/checkoutSlice';
 import { MaskedCard } from './MaskedCard';
+import { QuantityStepper } from './QuantityStepper';
 import { fetchQuote } from './quoteSlice';
 import './payment.css';
 
@@ -36,7 +38,7 @@ export function SummarySheet() {
             <ProductImage src={product.imageUrl} alt={product.name} priority />
             <div>
               <p className="sheet__product-name">{product.name}</p>
-              <p className="sheet__muted">Cantidad: {quantity}</p>
+              <QuantityStepper value={quantity} max={product.stock} onChange={(q) => dispatch(setQuantity(q))} />
             </div>
           </div>
         )}

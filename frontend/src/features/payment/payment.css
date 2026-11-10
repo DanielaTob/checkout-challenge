@@ -102,3 +102,28 @@
   .sheet-backdrop { align-items: center; }
   .sheet { border-radius: 20px; }
 }
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.stepper__button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #c9cfdc;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.stepper__button:disabled { opacity: 0.4; cursor: not-allowed; }
+.stepper__button:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.stepper__value {
+  min-width: 6.5em;
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}

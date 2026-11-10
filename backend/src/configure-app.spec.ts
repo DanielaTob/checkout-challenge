@@ -19,14 +19,15 @@ describe('configureApp', () => {
 
   afterAll(() => app.close());
 
-  it('GET /health answers 200 with security headers', async () => {
+  it('AC-006-03 GET /health answers 200 with security headers (HSTS, nosniff, no X-Powered-By)', async () => {
     const res = await request(app.getHttpServer()).get('/health').expect(200);
     expect(res.body).toEqual({ status: 'ok' });
+    expect(res.headers['strict-transport-security']).toMatch(/max-age=\d+/);
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['x-powered-by']).toBeUndefined();
   });
 
-  it('CORS only allows the configured origin', async () => {
+  it('AC-006-04 CORS only allows the configured origin', async () => {
     const allowed = await request(app.getHttpServer())
       .get('/health')
       .set('Origin', 'https://allowed.example');
@@ -39,7 +40,7 @@ describe('configureApp', () => {
     expect(denied.headers['access-control-allow-origin']).toBeUndefined();
   });
 
-  it('serves Swagger at /docs', async () => {
+  it('AC-006-05 serves Swagger at /docs', async () => {
     await request(app.getHttpServer()).get('/docs-json').expect(200);
   });
 

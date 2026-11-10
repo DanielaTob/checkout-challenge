@@ -18,6 +18,18 @@ Checkout móvil de un producto pagado con tarjeta de crédito a través de una p
 
 **Tarjetas del sandbox**: `4242 4242 4242 4242` → aprobada · `4111 1111 1111 1111` → rechazada (cualquier CVC de 3 dígitos y fecha futura).
 
+## Contenido
+
+- [Arquitectura](#arquitectura)
+- [Flujo de pago](#flujo-de-pago)
+- [Modelo de datos](#modelo-de-datos)
+- [API](#api)
+- [Calidad: cobertura y trazabilidad](#calidad-cobertura-y-trazabilidad)
+- [Estructura](#estructura)
+- [Desarrollo](#desarrollo)
+- [Git workflow](#git-workflow)
+- [Desarrollo asistido por IA](#desarrollo-asistido-por-ia)
+
 ## Arquitectura
 
 ### Backend: hexagonal (puertos y adaptadores)
@@ -510,3 +522,47 @@ gitGraph
   checkout develop
   merge main
 ```
+
+## Desarrollo asistido por IA
+
+El proyecto se hizo con agentes de IA (Claude Code) bajo **Spec-Driven Development**: primero la spec y sus criterios, luego el código, y una puerta de calidad automática que el agente no puede saltarse. La persona decide qué se construye, aprueba las specs, revisa los PR y autoriza cada push.
+
+```mermaid
+flowchart LR
+  P["prompt de la prueba<br/>docs/contexto.md"] --> SPEC["skill spec<br/>spec.md (AC Dado/Cuando/Entonces)<br/>plan.md · tasks.md"]
+  SPEC -->|"aprobada por la persona"| SHIP["skill ship<br/>rama feat/NNN · TDD por tarea"]
+  SHIP --> T["test con el ID del AC"] --> C["código mínimo"] --> V{"verify.sh"}
+  V -->|"falla"| C
+  V -->|"pasa"| CM["commit por tarea<br/>casilla marcada en tasks.md"]
+  CM -->|"siguiente tarea"| T
+  CM --> TR{"trace.ts"}
+  TR -->|"todos los AC con test"| PR["PR a develop<br/>(push solo con OK)"]
+  PR --> CI["CI: verify + trace --shipped"] --> M["merge commit"]
+```
+
+### Piezas
+
+- **[`AGENTS.md`](AGENTS.md)**: la "constitución" que cualquier agente lee antes de escribir código (Claude Code la carga desde `CLAUDE.md`; sirve también para Codex, Cursor o Copilot). Fija el stack, la estructura y reglas no negociables: nada de lógica en controladores, ROP, cobertura > 80 %, un test por AC, datos de tarjeta nunca guardados, secretos solo en `.env`, nombre comercial de la pasarela prohibido, códigos HTTP correctos, stock consistente, commits convencionales y **nunca hacer push sin permiso**.
+- **SDD en [`specs/`](specs/)**: cada funcionalidad tiene `spec.md` (objetivo, alcance, criterios `AC-NNN-YY` en Dado/Cuando/Entonces, casos borde), `plan.md` (diseño por capas) y `tasks.md` (tareas de ≤ 1 h, cada una con sus AC). Cuando algo cambió durante el desarrollo (por ejemplo, los límites de tiempo AC-005-14 y AC-005-15) se agregó primero el AC a la spec y después el código.
+- **Skills de proyecto** ([`.claude/skills/`](.claude/skills/)):
+  - [`spec`](.claude/skills/spec/SKILL.md): crea `specs/NNN-nombre/` con spec, plan y tareas antes de escribir código.
+  - [`ship`](.claude/skills/ship/SKILL.md): implementa una spec aprobada. Crea la rama `feat/NNN-nombre` desde `develop` y, tarea por tarea, escribe el test que falla, el código mínimo, pasa `verify` y hace un commit pequeño con la casilla marcada. Al final corre `trace` y abre el PR a `develop` (pidiendo permiso antes del push).
+  - [`verify`](.claude/skills/verify/SKILL.md): corre `scripts/verify.sh` y corrige hasta que pase, sin bajar umbrales, saltar pasos ni usar `--no-verify`.
+- **[`scripts/verify.sh`](scripts/verify.sh)**: una sola puerta de calidad para la persona, el agente, el pre-commit (Husky, variante rápida) y la CI. Corre lint, typecheck, tests con cobertura, build y `npm audit` en los dos paquetes, `gitleaks` y la búsqueda del nombre prohibido en archivos, nombres de archivo, ramas, commits y remotos.
+- **[`scripts/trace.ts`](scripts/trace.ts)**: matriz criterios → tests. Falla si un AC no tiene test; la CI la corre solo sobre las specs con `tasks.md` completo (`--shipped`).
+- **ADRs** ([`docs/adr/`](docs/adr/)): las decisiones (Neon + Lambda, versiones de herramientas, contrato del sandbox de la pasarela, probado con `curl` antes de escribir el adaptador) quedan escritas para que la siguiente sesión del agente no las vuelva a discutir.
+
+### Agentes en paralelo con `git worktree`
+
+El segundo día trabajaron dos agentes a la vez sobre el mismo repo, cada uno en su propio directorio y su propia rama:
+
+```bash
+git worktree add ../pt-backend feat/004-transaccion-pasarela   # agente de backend
+# el checkout principal queda para el agente de frontend (feat/00N-…-front)
+git worktree list
+```
+
+- Cada worktree tiene sus `node_modules`, su `.env` y su rama, así que los dos agentes pueden correr `verify.sh` y commitear sin pisarse. Comparten el historial: lo que uno integra en `develop` el otro lo trae con un merge.
+- Para que no haya conflictos se reparte el terreno por carpeta: el agente de backend no toca `frontend/` y viceversa. Los archivos compartidos (README, specs) tienen un solo dueño a la vez.
+- El contrato entre los dos es la API documentada en las specs y en Swagger. El agente de backend publica los endpoints con tests HTTP, y el de frontend los consume con dobles en sus tests.
+- Cuidado: el `git stash` es común a todos los worktrees, así que para dejar trabajo a un lado se usa un commit WIP o una rama local.

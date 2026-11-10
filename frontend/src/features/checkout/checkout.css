@@ -67,7 +67,7 @@
     box-shadow var(--dur) var(--ease);
 }
 .field__input::placeholder {
-  color: #8a8a84;
+  color: #6e6e68; /* 5.1:1 on white (AA) */
 }
 .field__input:focus-visible {
   outline: none;

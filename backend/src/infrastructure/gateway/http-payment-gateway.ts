@@ -27,6 +27,27 @@ export interface GatewayConfig {
 }
 
 export const DEFAULT_GATEWAY_TIMEOUT_MS = 8000;
+/** A retry with less time than this left cannot get a useful answer: give up instead. */
+export const MIN_RETRY_BUDGET_MS = 50;
+
+/**
+ * Abort signal driven by setTimeout (instead of AbortSignal.timeout) so the per-call
+ * timeout follows the same clock as the time budget, including Jest fake timers.
+ */
+const timeoutSignal = (
+  ms: number,
+): { signal: AbortSignal; clear: () => void } => {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () =>
+      controller.abort(
+        new DOMException('The operation timed out', 'TimeoutError'),
+      ),
+    ms,
+  );
+  return { signal: controller.signal, clear: () => clearTimeout(timer) };
+};
+
 /** Extra attempts for transient failures of the status read (GET only). */
 export const STATUS_READ_RETRIES = 2;
 
@@ -171,7 +192,7 @@ export class HttpPaymentGateway implements PaymentGateway {
           { timeoutMs: remaining() },
         ),
       STATUS_READ_RETRIES,
-      () => remaining() > 0,
+      () => remaining() >= MIN_RETRY_BUDGET_MS,
     );
     if (!res.ok) return res;
     if (res.value.status !== 200)
@@ -211,6 +232,7 @@ export class HttpPaymentGateway implements PaymentGateway {
     if (options.body !== undefined)
       headers['content-type'] = 'application/json';
     if (options.auth) headers.authorization = `Bearer ${options.auth}`;
+    const timeout = timeoutSignal(timeoutMs);
     try {
       const res = await this.fetchFn(
         `${this.config.baseUrl.replace(/\/+$/, '')}${urlPath}`,
@@ -221,7 +243,7 @@ export class HttpPaymentGateway implements PaymentGateway {
             options.body === undefined
               ? undefined
               : JSON.stringify(options.body),
-          signal: AbortSignal.timeout(timeoutMs),
+          signal: timeout.signal,
         },
       );
       const json: unknown = await res.json().catch(() => null);
@@ -239,6 +261,8 @@ export class HttpPaymentGateway implements PaymentGateway {
           ? 'The payment gateway did not answer in time'
           : 'The payment gateway is unreachable',
       );
+    } finally {
+      timeout.clear();
     }
   }
 }

@@ -39,5 +39,9 @@
   },
   "allowScripts": {
     "@parcel/watcher": false
+  },
+  "overrides": {
+    "glob": "^14.0.4",
+    "minimatch": "^11.0.6"
   }
 }

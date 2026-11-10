@@ -288,22 +288,66 @@ describe('HttpPaymentGateway', () => {
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
-  it('AC-005-15 a silent gateway makes the status read give up at its time limit, without retrying past it', async () => {
+  describe('AC-005-15 status read time budget (deterministic, fake timers)', () => {
     const hang: FetchFn = (_url, init) =>
       new Promise<Response>((_, reject) => {
         init?.signal?.addEventListener('abort', () =>
           reject(init.signal?.reason as Error),
         );
       });
-    const fetchFn = jest.fn(hang);
-    const gateway = new HttpPaymentGateway(
-      { ...config, timeoutMs: 60000 },
-      fetchFn,
-    );
-    const started = Date.now();
-    const r = await gateway.getTransaction('gw-1', { timeoutMs: 30 });
-    expect(!r.ok && r.error.code).toBe('GATEWAY_ERROR');
-    expect(Date.now() - started).toBeLessThan(2000);
-    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    beforeEach(() => jest.useFakeTimers({ now: 0 }));
+    afterEach(() => jest.useRealTimers());
+
+    it('AC-005-15 a silent gateway makes the status read give up exactly at its time limit, without retrying past it', async () => {
+      const fetchFn = jest.fn(hang);
+      const gateway = new HttpPaymentGateway(
+        { ...config, timeoutMs: 60000 },
+        fetchFn,
+      );
+      const pending = gateway.getTransaction('gw-1', { timeoutMs: 30 });
+      await jest.advanceTimersByTimeAsync(29);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
+      const r = await pending;
+      expect(!r.ok && r.error.code).toBe('GATEWAY_ERROR');
+      expect(!r.ok && r.error.message).toBe(
+        'The payment gateway did not answer in time',
+      );
+      expect(Date.now()).toBe(30);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('AC-005-15 does not retry when less than the minimum useful budget is left', async () => {
+      // The first attempt fails (5xx) after 20 ms: only 40 ms of the 60 ms budget remain → no retry.
+      const fetchFn = jest.fn<Promise<Response>, Parameters<FetchFn>>(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(new Response('{}', { status: 503 })), 20),
+          ),
+      );
+      const gateway = new HttpPaymentGateway(config, fetchFn);
+      const pending = gateway.getTransaction('gw-1', { timeoutMs: 60 });
+      await jest.advanceTimersByTimeAsync(20);
+      const r = await pending;
+      expect(!r.ok && r.error.code).toBe('GATEWAY_ERROR');
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('AC-005-15 retries a transient failure while enough budget remains', async () => {
+      const fetchFn = jest
+        .fn<Promise<Response>, Parameters<FetchFn>>()
+        .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ data: { id: 'gw-1', status: 'APPROVED' } }),
+            { status: 200 },
+          ),
+        );
+      const gateway = new HttpPaymentGateway(config, fetchFn);
+      const r = await gateway.getTransaction('gw-1', { timeoutMs: 1000 });
+      expect(r.ok && r.value.status).toBe('APPROVED');
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+    });
   });
 });

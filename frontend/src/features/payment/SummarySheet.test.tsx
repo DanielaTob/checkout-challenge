@@ -25,7 +25,7 @@ describe('SummarySheet', () => {
   it('AC-003-04 shows product, quantity and the backend breakdown (subtotal, base fee, delivery, total) in COP', async () => {
     getJson.mockResolvedValue(quoteFor(1));
     setup();
-    const sheet = screen.getByRole('dialog', { name: 'Resumen del pago' });
+    const sheet = screen.getByRole('dialog', { name: 'Resumen del pedido' });
     expect(within(sheet).getByRole('img', { name: headphones.name })).toBeInTheDocument();
     expect(await screen.findByText('Total')).toBeInTheDocument();
     expect(row('Subtotal')).toContain('$ 249.900');
@@ -64,7 +64,7 @@ describe('SummarySheet layout', () => {
   it('AC-003-10 renders as a modal bottom sheet over a dimmed backdrop', async () => {
     getJson.mockResolvedValue(quoteFor(1));
     setup();
-    const sheet = screen.getByRole('dialog', { name: 'Resumen del pago' });
+    const sheet = screen.getByRole('dialog', { name: 'Resumen del pedido' });
     expect(sheet).toHaveAttribute('aria-modal', 'true');
     expect(sheet).toHaveClass('sheet');
     expect(sheet.parentElement).toHaveClass('sheet-backdrop');

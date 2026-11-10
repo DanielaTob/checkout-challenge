@@ -40,8 +40,9 @@ const checkoutSlice = createSlice({
       state.card = action.payload.card;
       state.step = 'summary';
     },
-    /** Leaves the modal: delivery data is kept for next time, card data is dropped. */
-    closeCheckout(state) {
+    /** Leaves the modal: delivery data (also the draft being typed) is kept, card data is dropped. */
+    closeCheckout(state, action: PayloadAction<{ delivery?: DeliveryForm } | undefined>) {
+      if (action.payload?.delivery) state.delivery = action.payload.delivery;
       state.step = 'product';
       state.card = null;
     },

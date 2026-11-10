@@ -35,3 +35,25 @@ describe('getJson', () => {
     await expect(getJson('/products')).rejects.toMatchObject({ status: 0, message: 'Network error' });
   });
 });
+
+describe('postJson', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('POSTs JSON with extra headers and returns the parsed body', async () => {
+    const { postJson } = await import('./http');
+    const fetchMock = mockFetch(() => Promise.resolve({ ok: true, status: 201, json: () => Promise.resolve({ id: 'c1' }) }));
+    await expect(postJson('/customers', { a: 1 }, { 'Idempotency-Key': 'k' })).resolves.toEqual({ id: 'c1' });
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/customers', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': 'k' },
+      body: JSON.stringify({ a: 1 }),
+      signal: undefined,
+    });
+  });
+
+  it('maps non-2xx to ApiError', async () => {
+    const { postJson } = await import('./http');
+    mockFetch(() => Promise.resolve({ ok: false, status: 502, json: () => Promise.resolve({ message: 'Bad gateway' }) }));
+    await expect(postJson('/transactions', {})).rejects.toMatchObject({ status: 502, message: 'Bad gateway' });
+  });
+});

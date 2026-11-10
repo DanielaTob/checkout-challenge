@@ -2,9 +2,10 @@ import { useEffect, useId } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { formatCop } from '../../shared/utils/money';
 import { ProductImage } from '../product/ProductImage';
-import { setQuantity } from '../checkout/checkoutSlice';
+import { goToStep, setQuantity } from '../checkout/checkoutSlice';
 import { MaskedCard } from './MaskedCard';
 import { QuantityStepper } from './QuantityStepper';
+import { payTransaction } from './paymentSlice';
 import { fetchQuote } from './quoteSlice';
 import './payment.css';
 
@@ -15,6 +16,8 @@ export function SummarySheet() {
   const { productId, quantity, card } = useAppSelector((s) => s.checkout);
   const product = useAppSelector((s) => s.products.items.find((p) => p.id === productId));
   const quote = useAppSelector((s) => s.quote);
+  const payment = useAppSelector((s) => s.payment);
+  const paying = payment.status === 'paying';
 
   useEffect(() => {
     if (!productId) return;
@@ -85,8 +88,36 @@ export function SummarySheet() {
           </p>
         )}
 
-        <button type="button" className="button button--primary button--block" disabled={!ready}>
-          {ready && quote.data ? `Pagar ${formatCop(quote.data.totalInCents)}` : 'Pagar'}
+        {payment.status === 'failed' && payment.error && (
+          <p className="notice notice--error" role="alert">
+            {payment.error}
+          </p>
+        )}
+
+        <button
+          type="button"
+          className="button button--primary button--block"
+          disabled={!ready || paying}
+          aria-busy={paying ? 'true' : 'false'}
+          onClick={() => void dispatch(payTransaction())}
+        >
+          {paying ? (
+            <>
+              <span className="spinner" aria-hidden="true" /> Procesando pago…
+            </>
+          ) : ready && quote.data ? (
+            `Pagar ${formatCop(quote.data.totalInCents)}`
+          ) : (
+            'Pagar'
+          )}
+        </button>
+        <button
+          type="button"
+          className="button button--text button--block"
+          disabled={paying}
+          onClick={() => dispatch(goToStep('details'))}
+        >
+          Editar datos
         </button>
       </section>
     </div>

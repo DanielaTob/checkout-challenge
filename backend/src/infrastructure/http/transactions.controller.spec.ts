@@ -179,12 +179,31 @@ describe('TransactionsController (HTTP)', () => {
       .expect(409);
   });
 
+  it('AC-005-13 GET /transactions/by-key/:key answers 200 with the transaction, 404 for an unknown key and 400 for a non-UUID', async () => {
+    const key = '00000000-0000-4000-8000-0000000000c3';
+    const created = await post(body()).set('Idempotency-Key', key).expect(201);
+    const res = await request(app.getHttpServer())
+      .get(`/transactions/by-key/${key}`)
+      .expect(200);
+    expect(res.body).toEqual(created.body);
+    await request(app.getHttpServer())
+      .get('/transactions/by-key/00000000-0000-4000-8000-0000000000c4')
+      .expect(404);
+    await request(app.getHttpServer())
+      .get('/transactions/by-key/nope')
+      .expect(400);
+  });
+
   it('documents the transaction routes in Swagger', async () => {
     const res = await request(app.getHttpServer())
       .get('/docs-json')
       .expect(200);
     expect(Object.keys((res.body as { paths: Body }).paths)).toEqual(
-      expect.arrayContaining(['/transactions', '/transactions/{id}']),
+      expect.arrayContaining([
+        '/transactions',
+        '/transactions/{id}',
+        '/transactions/by-key/{idempotencyKey}',
+      ]),
     );
   });
 });

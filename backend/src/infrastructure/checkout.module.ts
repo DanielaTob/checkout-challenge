@@ -4,6 +4,7 @@ import { GetDelivery } from '../application/deliveries/get-delivery.use-case';
 import { ApplyTransactionResult } from '../application/transactions/apply-transaction-result.use-case';
 import { CreateTransaction } from '../application/transactions/create-transaction.use-case';
 import { GetTransaction } from '../application/transactions/get-transaction.use-case';
+import { GetTransactionByKey } from '../application/transactions/get-transaction-by-key.use-case';
 import { PollTransactionStatus } from '../application/transactions/poll-transaction-status.use-case';
 import { RefreshTransaction } from '../application/transactions/refresh-transaction.use-case';
 import {
@@ -114,6 +115,12 @@ import { ProductsModule } from './products.module';
       provide: GetTransaction,
       useFactory: (repo: TransactionRepository, refresh: RefreshTransaction) =>
         new GetTransaction(repo, refresh),
+      inject: [TRANSACTION_REPOSITORY, RefreshTransaction],
+    },
+    {
+      provide: GetTransactionByKey,
+      useFactory: (repo: TransactionRepository, refresh: RefreshTransaction) =>
+        new GetTransactionByKey(repo, refresh),
       inject: [TRANSACTION_REPOSITORY, RefreshTransaction],
     },
   ],

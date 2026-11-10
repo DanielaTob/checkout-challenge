@@ -23,6 +23,7 @@ import {
 import type { Response } from 'express';
 import { CreateTransaction } from '../../application/transactions/create-transaction.use-case';
 import { GetTransaction } from '../../application/transactions/get-transaction.use-case';
+import { GetTransactionByKey } from '../../application/transactions/get-transaction-by-key.use-case';
 import { IdempotencyKey } from './idempotency-key.decorator';
 import { unwrapOrThrow } from './result-to-http';
 import {
@@ -38,6 +39,7 @@ export class TransactionsController {
   constructor(
     private readonly createTransaction: CreateTransaction,
     private readonly getTransaction: GetTransaction,
+    private readonly getTransactionByKey: GetTransactionByKey,
   ) {}
 
   @Post()
@@ -83,6 +85,24 @@ export class TransactionsController {
     );
     res.status(created ? HttpStatus.CREATED : HttpStatus.OK);
     return toTransactionResponse(transaction);
+  }
+
+  // Declared before ':id' so that "by-key" is not parsed as an id.
+  @Get('by-key/:idempotencyKey')
+  @ApiOperation({
+    summary:
+      'Recover a payment by the Idempotency-Key the client sent (refreshed if PENDING)',
+  })
+  @ApiOkResponse({ type: TransactionResponseDto })
+  @ApiBadRequestResponse({ description: 'key is not a UUID' })
+  @ApiNotFoundResponse({ description: 'No transaction for that key' })
+  @ApiBadGatewayResponse({ description: 'The payment gateway failed' })
+  async findByKey(
+    @Param('idempotencyKey', new ParseUUIDPipe()) key: string,
+  ): Promise<TransactionResponseDto> {
+    return toTransactionResponse(
+      unwrapOrThrow(await this.getTransactionByKey.execute(key)),
+    );
   }
 
   @Get(':id')

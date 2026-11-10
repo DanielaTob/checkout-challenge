@@ -18,9 +18,12 @@ export function ProductList({ onPay = () => {} }: Props) {
     if (status === 'idle') void dispatch(fetchProducts());
   }, [dispatch, status]);
 
-  if (status === 'idle' || status === 'loading') {
+  // Skeleton only on the first load; on a refresh the cards stay (and highlight the new stock).
+  if ((status === 'idle' || status === 'loading') && items.length === 0) {
     return (
       <div className="product-list" role="status" aria-busy="true" aria-label="Cargando productos">
+        <ProductSkeleton />
+        <ProductSkeleton />
         <ProductSkeleton />
       </div>
     );

@@ -25,7 +25,7 @@ const FIELDS: { key: keyof DeliveryForm; label: string; input: InputHints }[] = 
 export function DeliveryFields({ value, errors, touched, onChange, onBlur }: Props) {
   return (
     <fieldset className="form-section">
-      <legend className="form-section__title">Datos de entrega</legend>
+      <legend className="form-section__title">Entrega</legend>
       {FIELDS.map(({ key, label, input }) => (
         <TextField
           {...input}

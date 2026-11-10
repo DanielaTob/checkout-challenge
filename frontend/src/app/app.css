@@ -1,0 +1,114 @@
+/* ---------- Header ---------- */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 0 4px;
+}
+.app-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.app-header__logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 1rem;
+}
+.app-header__tag {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+/* ---------- Progress stepper ---------- */
+.progress__list {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.progress__step {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 4px;
+  border-radius: 999px;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.progress__index {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.progress__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress__step--current {
+  background: var(--color-text);
+  color: #fff;
+  font-weight: 600;
+}
+.progress__step--current .progress__index {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.progress__step--done {
+  color: var(--color-text);
+}
+.progress__step--done .progress__index {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* Phones: the current step gets room for its full label. */
+@media (max-width: 639px) {
+  .progress__step--current {
+    flex-grow: 2.4;
+  }
+}
+
+/* Very narrow phones: keep numbers, hide labels of non-current steps. */
+@media (max-width: 400px) {
+  .progress__step:not(.progress__step--current) .progress__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-header {
+    padding-top: 28px;
+  }
+  .progress {
+    max-width: 640px;
+  }
+}

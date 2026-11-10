@@ -1,27 +1,30 @@
 .checkout-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
+/* "Tarjeta" and "Entrega" blocks */
 .form-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin: 0;
-  padding: var(--space);
-  border: 0;
-  border-radius: var(--radius);
-  background: var(--color-surface);
+  gap: 14px;
   min-width: 0;
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .form-section__title {
   float: left; /* lets the legend sit inside the padded box */
   width: 100%;
+  margin-bottom: 2px;
   padding: 0;
-  margin-bottom: 4px;
-  font-weight: 700;
+  font-size: 1.0625rem;
+  font-weight: 600;
 }
 
 .form-row {
@@ -33,12 +36,13 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
 }
 
 .field__label {
-  font-size: 0.875rem;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -50,38 +54,82 @@
 
 .field__input {
   width: 100%;
-  min-height: 48px;
-  padding: 0 12px;
-  border: 1px solid #c9cfdc;
-  border-radius: 10px;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   background: #fff;
+  color: var(--color-text);
   font: inherit;
   font-size: 1rem; /* ≥16px avoids iOS zoom on focus */
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+.field__input::placeholder {
+  color: #6e6e68; /* 5.1:1 on white (AA) */
 }
 .field__input:focus-visible {
-  outline: 3px solid rgb(41 82 227 / 0.35);
-  border-color: var(--color-primary);
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px rgb(181 230 29 / 0.55);
 }
 .field__input[aria-invalid='true'] {
   border-color: var(--color-danger);
+  background: #fffafa;
+}
+.field__input[aria-invalid='true']:focus-visible {
+  box-shadow: 0 0 0 3px rgb(180 35 24 / 0.2);
 }
 .field__control:has(.field__adornment) .field__input {
-  padding-right: 64px;
+  padding-right: 68px;
 }
 
+/* Brand logo inside the card number input */
 .field__adornment {
   position: absolute;
   right: 10px;
   display: flex;
+  animation: adornment-in var(--dur) var(--ease);
+}
+@keyframes adornment-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
 }
 
 .field__error {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
   margin: 0;
   color: var(--color-danger);
   font-size: 0.8125rem;
+  font-weight: 500;
+}
+.field__error::before {
+  content: '!';
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
 }
 
 .brand-logo {
-  width: 44px;
-  height: 29px;
+  width: 46px;
+  height: 30px;
+  border-radius: 6px;
+}
+
+@media (hover: hover) {
+  .field__input:hover {
+    border-color: #cfccc2;
+  }
 }

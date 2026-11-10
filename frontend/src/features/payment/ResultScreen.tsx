@@ -18,6 +18,27 @@ const rejectionText = (tx: Transaction) =>
   (tx.failureReason && FAILURE_TEXT[tx.failureReason]) ??
   'Tu banco o la pasarela rechazaron el pago. No se hizo ningún cobro.';
 
+function TransactionDetails({ transaction }: { transaction: Transaction }) {
+  return (
+    <dl className="result__details">
+      <div>
+        <dt>Referencia</dt>
+        <dd>{transaction.reference}</dd>
+      </div>
+      <div>
+        <dt>Total</dt>
+        <dd data-testid="result-total">{formatCop(transaction.totalInCents)}</dd>
+      </div>
+      {transaction.cardBrand && transaction.cardLast4 && (
+        <div>
+          <dt>Tarjeta</dt>
+          <dd>{`${transaction.cardBrand} •••• ${transaction.cardLast4}`}</dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
 /** Screen 4: result of the payment. Polls while PENDING (every 2 s, up to 2 min). */
 export function ResultScreen() {
   const dispatch = useAppDispatch();
@@ -89,23 +110,8 @@ export function ResultScreen() {
           </span>
           <h2 className="result__title">¡Pago aprobado!</h2>
         </div>
-        <dl className="result__details">
-          <div>
-            <dt>Referencia</dt>
-            <dd>{transaction.reference}</dd>
-          </div>
-          <div>
-            <dt>Total pagado</dt>
-            <dd data-testid="result-total">{formatCop(transaction.totalInCents)}</dd>
-          </div>
-          {transaction.cardBrand && transaction.cardLast4 && (
-            <div>
-              <dt>Tarjeta</dt>
-              <dd>{`${transaction.cardBrand} •••• ${transaction.cardLast4}`}</dd>
-            </div>
-          )}
-        </dl>
-        <p className="result__muted">Te enviaremos el pedido a la dirección indicada.</p>
+        <p className="result__message">Tu pedido está confirmado. Lo enviaremos a la dirección indicada.</p>
+        <TransactionDetails transaction={transaction} />
         <button type="button" className="button button--primary button--block" onClick={backToShop}>
           Volver a la tienda
         </button>
@@ -122,7 +128,7 @@ export function ResultScreen() {
       <p className="notice notice--error" role="alert">
         {rejectionText(transaction)}
       </p>
-      <p className="result__muted">Referencia {transaction.reference}</p>
+      <TransactionDetails transaction={transaction} />
       <button type="button" className="button button--primary button--block" onClick={tryAgain}>
         Intentar de nuevo
       </button>

@@ -21,7 +21,7 @@ export function CardFields({ value, errors, touched, onChange, onBlur }: Props) 
 
   return (
     <fieldset className="form-section">
-      <legend className="form-section__title">Tarjeta de crédito</legend>
+      <legend className="form-section__title">Tarjeta</legend>
       <TextField
         label="Número de tarjeta"
         value={value.number}

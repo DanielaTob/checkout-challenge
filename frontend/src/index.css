@@ -93,3 +93,6 @@ body {
 #root {
   min-width: 320px;
 }
+.button--block {
+  width: 100%;
+}

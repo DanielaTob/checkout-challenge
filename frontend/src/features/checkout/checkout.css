@@ -1,0 +1,87 @@
+.checkout-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: var(--space);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  min-width: 0;
+}
+
+.form-section__title {
+  float: left; /* lets the legend sit inside the padded box */
+  width: 100%;
+  padding: 0;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.field__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field__input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid #c9cfdc;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 1rem; /* ≥16px avoids iOS zoom on focus */
+}
+.field__input:focus-visible {
+  outline: 3px solid rgb(41 82 227 / 0.35);
+  border-color: var(--color-primary);
+}
+.field__input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+.field__control:has(.field__adornment) .field__input {
+  padding-right: 64px;
+}
+
+.field__adornment {
+  position: absolute;
+  right: 10px;
+  display: flex;
+}
+
+.field__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.8125rem;
+}
+
+.brand-logo {
+  width: 44px;
+  height: 29px;
+}

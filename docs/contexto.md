@@ -62,7 +62,7 @@ Lo leen los agentes al iniciar una sesión. Resume los requisitos de la prueba y
 
 Verifica en la documentación oficial de la pasarela los endpoints exactos y las tarjetas de prueba del sandbox (una aprobada y una rechazada).
 
-## Variables de entorno (`.env.example`)
+## Variables de entorno (`backend/.env.example`)
 
 ```
 GATEWAY_BASE_URL=
@@ -73,7 +73,11 @@ GATEWAY_EVENTS_SECRET=
 DATABASE_URL=
 BASE_FEE_IN_CENTS=
 DELIVERY_FEE_IN_CENTS=
+DIRECT_DATABASE_URL=   # Neon sin pooler, solo migraciones
+CORS_ORIGINS=          # orígenes permitidos, separados por coma
 ```
+
+Front: `frontend/.env.example` con `VITE_API_URL`.
 
 ## Modelo de datos inicial
 

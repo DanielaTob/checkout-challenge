@@ -1,0 +1,86 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  ERROR
+}
+
+enum DeliveryStatus {
+  PENDING
+  DISPATCHED
+  DELIVERED
+}
+
+model Product {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String
+  description  String
+  imageUrl     String        @map("image_url")
+  priceInCents Int           @map("price_in_cents")
+  stock        Int
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  transactions Transaction[]
+
+  @@map("products")
+}
+
+model Customer {
+  id           String        @id @default(uuid()) @db.Uuid
+  fullName     String        @map("full_name")
+  email        String
+  phone        String
+  createdAt    DateTime      @default(now()) @map("created_at")
+  transactions Transaction[]
+  deliveries   Delivery[]
+
+  @@map("customers")
+}
+
+model Transaction {
+  id                   String            @id @default(uuid()) @db.Uuid
+  reference            String            @unique
+  productId            String            @map("product_id") @db.Uuid
+  customerId           String            @map("customer_id") @db.Uuid
+  quantity             Int
+  amountInCents        Int               @map("amount_in_cents")
+  baseFeeInCents       Int               @map("base_fee_in_cents")
+  deliveryFeeInCents   Int               @map("delivery_fee_in_cents")
+  status               TransactionStatus @default(PENDING)
+  gatewayTransactionId String?           @map("gateway_transaction_id")
+  cardBrand            String?           @map("card_brand")
+  cardLast4            String?           @map("card_last4") @db.Char(4)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  product              Product           @relation(fields: [productId], references: [id])
+  customer             Customer          @relation(fields: [customerId], references: [id])
+  delivery             Delivery?
+
+  @@map("transactions")
+}
+
+model Delivery {
+  id            String         @id @default(uuid()) @db.Uuid
+  transactionId String         @unique @map("transaction_id") @db.Uuid
+  customerId    String         @map("customer_id") @db.Uuid
+  address       String
+  city          String
+  region        String
+  postalCode    String         @map("postal_code")
+  status        DeliveryStatus @default(PENDING)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  transaction   Transaction    @relation(fields: [transactionId], references: [id])
+  customer      Customer       @relation(fields: [customerId], references: [id])
+
+  @@map("deliveries")
+}

@@ -17,7 +17,7 @@ describe('validateEnv', () => {
     expect(env.DELIVERY_FEE_IN_CENTS).toBe(1000000);
   });
 
-  it('rejects missing vars naming only the properties, never values', () => {
+  it('AC-006-06 rejects missing vars naming only the properties, never values', () => {
     const rest: Record<string, string> = { ...valid };
     delete rest.GATEWAY_PRIVATE_KEY;
     expect(() => validateEnv({ ...rest, BASE_FEE_IN_CENTS: '-1' })).toThrow(

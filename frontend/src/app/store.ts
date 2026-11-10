@@ -9,18 +9,34 @@ import {
   REGISTER,
   REHYDRATE,
 } from 'redux-persist';
+import { cardSessionReducer } from '../features/checkout/cardSessionSlice';
 import { checkoutReducer } from '../features/checkout/checkoutSlice';
+import { paymentReducer } from '../features/payment/paymentSlice';
+import { quoteReducer } from '../features/payment/quoteSlice';
+import { productsReducer } from '../features/product/productsSlice';
+import { migratePersistedState, PERSIST_VERSION } from './persistedState';
 import { createLocalStorage } from './storage';
 
-export const rootReducer = combineReducers({ checkout: checkoutReducer });
+export { PERSIST_VERSION };
+
+export const rootReducer = combineReducers({
+  checkout: checkoutReducer,
+  cardSession: cardSessionReducer,
+  products: productsReducer,
+  quote: quoteReducer,
+  payment: paymentReducer,
+});
 
 // Only whitelisted slices are persisted. Card number and CVC must never reach any slice
 // that is persisted (see spec 005); they live only in component state.
 export const persistConfig = {
   key: 'checkout-app',
-  version: 1,
+  version: PERSIST_VERSION,
   storage: createLocalStorage(),
-  whitelist: ['checkout'],
+  // checkout: step, product, quantity, delivery and brand+last4. payment: idempotency key and result.
+  // Never cardSession (full number/CVC), products or quote (always fetched fresh).
+  whitelist: ['checkout', 'payment'],
+  migrate: migratePersistedState,
 };
 
 export const makeStore = () => {

@@ -30,6 +30,8 @@ Que recargar la página nunca haga perder el paso ni provoque un doble cobro, y 
 - **AC-005-11** — Dado que la pasarela no responde, cuando pasan 8 s, entonces se corta la petición y se trata como `GATEWAY_ERROR`.
 - **AC-005-12** — Dada una consulta de estado a la pasarela que falla de forma transitoria, cuando se reintenta, entonces solo se reintentan las consultas `GET` (hasta 2 veces); la creación de la transacción en la pasarela nunca se reintenta.
 - **AC-005-13** — Dado `GET /transactions/by-key/:idempotencyKey`, cuando la clave existe, entonces responde `200` con la transacción; si no, `404`.
+- **AC-005-14** — Dado un `POST /transactions`, cuando la pasarela responde lento, entonces la petición completa no pasa de ~15 s: cada llamada a la pasarela usa como timeout el menor entre 8 s y el tiempo que queda del presupuesto, y la consulta de estado se detiene cuando se agota. Si el cobro ya se creó en la pasarela, la API responde `201` con `status: "PENDING"` y el front sigue con `GET /transactions/:id`; si el presupuesto se agota antes de crear el cobro, responde `502` y la transacción queda en ERROR sin cobro.
+- **AC-005-15** — Dada una transacción PENDING, cuando hago `GET /transactions/:id` o `GET /transactions/by-key/:key` y la pasarela responde lento, entonces la consulta a la pasarela (con sus reintentos) no pasa de ~10 s: cada intento usa como timeout el menor entre 8 s y el tiempo que queda, y no se reintenta si ya no hay tiempo. Si se agota, responde `502` y la transacción sigue en PENDING para la siguiente consulta del front.
 
 ## Casos borde
 - El usuario borra `localStorage` a mitad del flujo → vuelve a producto (sin error).

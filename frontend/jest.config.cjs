@@ -8,6 +8,7 @@ module.exports = {
     '\\.(css)$': 'identity-obj-proxy',
     '\\.(png|jpe?g|webp|svg)$': '<rootDir>/src/test/fileMock.cjs',
   },
+  globals: { __API_URL__: 'http://api.test' },
   setupFilesAfterEnv: ['<rootDir>/src/test/setupTests.ts'],
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/main.tsx', '!src/test/**', '!src/**/*.d.ts'],
   coverageReporters: ['text-summary', 'text', 'lcov', 'json-summary'],

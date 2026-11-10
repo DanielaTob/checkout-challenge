@@ -20,6 +20,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:reset-demo": "tsx prisma/reset-demo.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -84,7 +85,8 @@
       "!main.ts",
       "!lambda.ts",
       "!generated/**",
-      "!**/*.module.ts"
+      "!**/*.module.ts",
+      "!test/**"
     ],
     "coverageDirectory": "../coverage",
     "coverageReporters": [
@@ -113,5 +115,9 @@
     "esbuild@0.28.2": true,
     "@scarf/scarf": false,
     "@parcel/watcher": false
+  },
+  "overrides": {
+    "glob": "^14.0.4",
+    "minimatch": "^11.0.6"
   }
 }

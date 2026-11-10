@@ -19,3 +19,4 @@ lambda.zip
 .idea/
 .vscode/
 backend/src/generated/
+.build/

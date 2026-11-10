@@ -1,0 +1,228 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Checkout challenge - NestJS API on Lambda (outside VPC) behind an HTTP API,
+  React SPA on a private S3 bucket served by CloudFront (OAC, HTTPS, security headers).
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: checkout-challenge
+  LambdaRuntime:
+    Type: String
+    Default: nodejs22.x
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Description: Neon prod branch, pooled connection string (sslmode=require)
+  GatewayBaseUrl:
+    Type: String
+  GatewayPublicKey:
+    Type: String
+  GatewayPrivateKey:
+    Type: String
+    NoEcho: true
+  GatewayIntegritySecret:
+    Type: String
+    NoEcho: true
+  GatewayEventsSecret:
+    Type: String
+    NoEcho: true
+  BaseFeeInCents:
+    Type: Number
+  DeliveryFeeInCents:
+    Type: Number
+
+Resources:
+  # ---------------------------------------------------------------- Backend
+  ApiFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-api'
+      Description: NestJS checkout API (hexagonal + ROP)
+      Runtime: !Ref LambdaRuntime
+      Architectures: [arm64]
+      Handler: dist/lambda.handler
+      MemorySize: 1024
+      Timeout: 29 # HTTP API integration limit is 30 s
+      Role: !GetAtt ApiFunctionRole.Arn
+      Code: ../.build/backend-lambda.zip # uploaded by `aws cloudformation package`
+      Environment:
+        Variables:
+          NODE_ENV: production
+          NODE_OPTIONS: --enable-source-maps
+          DATABASE_URL: !Ref DatabaseUrl
+          GATEWAY_BASE_URL: !Ref GatewayBaseUrl
+          GATEWAY_PUBLIC_KEY: !Ref GatewayPublicKey
+          GATEWAY_PRIVATE_KEY: !Ref GatewayPrivateKey
+          GATEWAY_INTEGRITY_SECRET: !Ref GatewayIntegritySecret
+          GATEWAY_EVENTS_SECRET: !Ref GatewayEventsSecret
+          BASE_FEE_IN_CENTS: !Ref BaseFeeInCents
+          DELIVERY_FEE_IN_CENTS: !Ref DeliveryFeeInCents
+          CORS_ORIGINS: !Sub 'https://${Distribution.DomainName}'
+
+  ApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ApiFunction}'
+      RetentionInDays: 14
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${ProjectName}-http-api'
+      ProtocolType: HTTP
+      # CORS is handled by NestJS (enableCors with CORS_ORIGINS), so OPTIONS reaches Lambda.
+
+  HttpApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ApiFunction.Arn
+      PayloadFormatVersion: '2.0'
+      TimeoutInMillis: 29000
+
+  HttpApiDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: $default
+      Target: !Sub 'integrations/${HttpApiIntegration}'
+
+  HttpApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 50
+        ThrottlingRateLimit: 20
+
+  ApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*'
+
+  # --------------------------------------------------------------- Frontend
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-web-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+
+  FrontendOac:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${ProjectName}-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SecurityHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub '${ProjectName}-security-headers'
+        SecurityHeadersConfig:
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: true
+            Override: true
+          ContentTypeOptions: { Override: true }
+          FrameOptions: { FrameOption: DENY, Override: true }
+          ReferrerPolicy: { ReferrerPolicy: strict-origin-when-cross-origin, Override: true }
+          ContentSecurityPolicy:
+            Override: true
+            ContentSecurityPolicy: !Sub >-
+              default-src 'self';
+              script-src 'self';
+              style-src 'self';
+              img-src 'self' data:;
+              font-src 'self';
+              connect-src 'self' https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com;
+              frame-ancestors 'none';
+              base-uri 'self';
+              form-action 'self';
+              object-src 'none'
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub '${ProjectName} SPA'
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: spa-bucket
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !Ref FrontendOac
+            S3OriginConfig: { OriginAccessIdentity: '' }
+        DefaultCacheBehavior:
+          TargetOriginId: spa-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          ResponseHeadersPolicyId: !Ref SecurityHeadersPolicy
+        # SPA routing: unknown paths fall back to index.html
+        CustomErrorResponses:
+          - { ErrorCode: 403, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0 }
+          - { ErrorCode: 404, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0 }
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontOacRead
+            Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+
+Outputs:
+  ApiUrl:
+    Value: !GetAtt HttpApi.ApiEndpoint
+  FrontendUrl:
+    Value: !Sub 'https://${Distribution.DomainName}'
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  DistributionId:
+    Value: !Ref Distribution
+  ApiFunctionName:
+    Value: !Ref ApiFunction

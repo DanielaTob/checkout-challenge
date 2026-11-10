@@ -205,6 +205,35 @@ describe('TransactionsController (HTTP)', () => {
     expect(ctx.gateway.getTransaction).not.toHaveBeenCalled();
   });
 
+  it('AC-005-15 GET /transactions/:id and /by-key/:key bound the gateway re-read to 10 s and answer 502 if it runs out, keeping PENDING', async () => {
+    const key = '00000000-0000-4000-8000-0000000000c5';
+    ctx.gateway.answerStatuses('PENDING');
+    const created = await post(body()).set('Idempotency-Key', key).expect(201);
+    const id = (created.body as Body).id as string;
+    const timedOut = err(
+      domainError(
+        'GATEWAY_ERROR',
+        'The payment gateway did not answer in time',
+      ),
+    );
+    ctx.gateway.getTransaction.mockClear();
+    ctx.gateway.getTransaction
+      .mockResolvedValueOnce(timedOut)
+      .mockResolvedValueOnce(timedOut);
+
+    await request(app.getHttpServer()).get(`/transactions/${id}`).expect(502);
+    await request(app.getHttpServer())
+      .get(`/transactions/by-key/${key}`)
+      .expect(502);
+
+    const gatewayId = ctx.transactions.rows[0].gatewayTransactionId;
+    expect(ctx.gateway.getTransaction.mock.calls).toEqual([
+      [gatewayId, { timeoutMs: 10000 }],
+      [gatewayId, { timeoutMs: 10000 }],
+    ]);
+    expect(ctx.transactions.rows[0].status).toBe('PENDING');
+  });
+
   it('documents the transaction routes in Swagger', async () => {
     const res = await request(app.getHttpServer())
       .get('/docs-json')

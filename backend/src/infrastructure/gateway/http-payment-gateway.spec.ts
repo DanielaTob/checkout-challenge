@@ -287,4 +287,23 @@ describe('HttpPaymentGateway', () => {
     expect(!r.ok && r.error.code).toBe('GATEWAY_ERROR');
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
+
+  it('AC-005-15 a silent gateway makes the status read give up at its time limit, without retrying past it', async () => {
+    const hang: FetchFn = (_url, init) =>
+      new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener('abort', () =>
+          reject(init.signal?.reason as Error),
+        );
+      });
+    const fetchFn = jest.fn(hang);
+    const gateway = new HttpPaymentGateway(
+      { ...config, timeoutMs: 60000 },
+      fetchFn,
+    );
+    const started = Date.now();
+    const r = await gateway.getTransaction('gw-1', { timeoutMs: 30 });
+    expect(!r.ok && r.error.code).toBe('GATEWAY_ERROR');
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
 });

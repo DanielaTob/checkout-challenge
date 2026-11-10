@@ -57,4 +57,23 @@ describe('GetTransaction', () => {
     const failed = await getTransaction.execute(tx.id);
     expect(!failed.ok && failed.error.code).toBe('GATEWAY_ERROR');
   });
+
+  it('AC-005-15 the gateway re-read of a PENDING transaction is bounded to 10 s; if it fails the transaction stays PENDING', async () => {
+    const { f, tx, getTransaction } = await setup(['PENDING']);
+    f.gateway.getTransaction.mockClear();
+    f.gateway.getTransaction.mockResolvedValueOnce(
+      err(
+        domainError(
+          'GATEWAY_ERROR',
+          'The payment gateway did not answer in time',
+        ),
+      ),
+    );
+    const result = await getTransaction.execute(tx.id);
+    expect(f.gateway.getTransaction).toHaveBeenCalledWith('gw-TX-1', {
+      timeoutMs: 10000,
+    });
+    expect(!result.ok && result.error.code).toBe('GATEWAY_ERROR');
+    expect(f.transactions.rows[0].status).toBe('PENDING');
+  });
 });

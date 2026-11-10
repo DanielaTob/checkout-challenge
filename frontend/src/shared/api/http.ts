@@ -19,13 +19,29 @@ const errorMessage = async (res: Response): Promise<string> => {
   }
 };
 
-export const getJson = async <T>(path: string, signal?: AbortSignal): Promise<T> => {
+const request = async <T>(path: string, init: RequestInit): Promise<T> => {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { headers: { Accept: 'application/json' }, signal });
+    res = await fetch(`${API_URL}${path}`, init);
   } catch {
     throw new ApiError(0, 'Network error');
   }
   if (!res.ok) throw new ApiError(res.status, await errorMessage(res));
   return (await res.json()) as T;
 };
+
+export const getJson = <T>(path: string, signal?: AbortSignal): Promise<T> =>
+  request<T>(path, { headers: { Accept: 'application/json' }, signal });
+
+export const postJson = <T>(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+  signal?: AbortSignal,
+): Promise<T> =>
+  request<T>(path, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+    signal,
+  });

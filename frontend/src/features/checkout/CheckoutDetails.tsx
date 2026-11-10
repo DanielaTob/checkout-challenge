@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { Modal } from '../../shared/ui/Modal';
-import { onlyDigits } from '../../shared/utils/card';
+import { formatCardNumber, onlyDigits } from '../../shared/utils/card';
 import { validateDelivery, type DeliveryForm } from '../../shared/utils/delivery';
 import { CardFields } from './CardFields';
 import { setCardSession } from './cardSessionSlice';
@@ -14,8 +14,12 @@ import './checkout.css';
 export function CheckoutDetails() {
   const dispatch = useAppDispatch();
   const savedDelivery = useAppSelector((s) => s.checkout.delivery);
+  const cardSession = useAppSelector((s) => s.cardSession);
 
-  const [card, setCard] = useState<CardForm>(emptyCard);
+  // Coming back from the summary ("Editar datos") the card is still in memory: prefill it.
+  const [card, setCard] = useState<CardForm>(() =>
+    cardSession ? { ...cardSession, number: formatCardNumber(cardSession.number) } : emptyCard,
+  );
   const [delivery, setDelivery] = useState<DeliveryForm>(savedDelivery);
   const [cardTouched, setCardTouched] = useState<Partial<Record<keyof CardForm, boolean>>>({});
   const [deliveryTouched, setDeliveryTouched] = useState<Partial<Record<keyof DeliveryForm, boolean>>>({});

@@ -96,3 +96,7 @@ body {
 .button--block {
   width: 100%;
 }
+.button--text {
+  background: transparent;
+  color: var(--color-primary);
+}

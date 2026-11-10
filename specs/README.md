@@ -4,7 +4,7 @@
 |---|---|---|
 | [001-catalogo-stock](001-catalogo-stock/spec.md) | Productos, stock, pantalla de producto | Implementada |
 | [002-tarjeta-entrega](002-tarjeta-entrega/spec.md) | Modal de tarjeta (Luhn, fecha, CVC, marca) y datos de entrega | Implementada |
-| [003-resumen-pago](003-resumen-pago/spec.md) | Cotización en backend y backdrop de resumen | Backend implementado (front pendiente) |
+| [003-resumen-pago](003-resumen-pago/spec.md) | Cotización en backend y backdrop de resumen | Implementada |
 | [004-transaccion-pasarela](004-transaccion-pasarela/spec.md) | Clientes, transacción, pasarela, entrega, stock y pantalla de resultado | Backend implementado (front pendiente) |
 | [005-resiliencia](005-resiliencia/spec.md) | Recuperar el paso tras un refresh, idempotencia y timeouts | Backend implementado (front pendiente) |
 | 006-despliegue | AWS, HTTPS y headers | Pendiente |

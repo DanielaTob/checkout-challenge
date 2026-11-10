@@ -1,7 +1,7 @@
 # 001 · Tareas
 
 - [x] T1 — Migración inicial de Prisma y seed idempotente (AC-001-05)
-- [ ] T2 — Dominio `Product` + puerto + casos de uso list/get con `Result` (AC-001-01, AC-001-02, AC-001-03)
+- [x] T2 — Dominio `Product` + puerto + casos de uso list/get con `Result` (AC-001-01, AC-001-02, AC-001-03)
 - [ ] T3 — Adaptador Prisma del repositorio de productos (AC-001-01, AC-001-02)
 - [ ] T4 — `ProductsController` + DTO + Swagger + pipes (AC-001-01, AC-001-02, AC-001-03, AC-001-04)
 - [ ] T5 — Front: `config.ts`, cliente HTTP y `formatCop` (AC-001-06)

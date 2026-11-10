@@ -59,3 +59,15 @@ describe('SummarySheet', () => {
     expect(screen.getByRole('button', { name: /Pagar/ })).toBeEnabled();
   });
 });
+
+describe('SummarySheet layout', () => {
+  it('AC-003-10 renders as a modal bottom sheet over a dimmed backdrop', async () => {
+    getJson.mockResolvedValue(quoteFor(1));
+    setup();
+    const sheet = screen.getByRole('dialog', { name: 'Resumen del pago' });
+    expect(sheet).toHaveAttribute('aria-modal', 'true');
+    expect(sheet).toHaveClass('sheet');
+    expect(sheet.parentElement).toHaveClass('sheet-backdrop');
+    expect(await screen.findByRole('button', { name: /Pagar/ })).toBeInTheDocument();
+  });
+});

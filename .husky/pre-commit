@@ -1,0 +1,1 @@
+VERIFY_FAST=1 scripts/verify.sh

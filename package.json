@@ -1,0 +1,19 @@
+{
+  "name": "checkout-monorepo",
+  "private": true,
+  "description": "Mobile checkout with a sandbox payment gateway (NestJS + React)",
+  "scripts": {
+    "prepare": "husky",
+    "verify": "scripts/verify.sh",
+    "trace": "tsx scripts/trace.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "husky": "^9.1.7",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

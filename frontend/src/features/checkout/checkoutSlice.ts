@@ -16,6 +16,8 @@ export interface CheckoutState {
   quantity: number;
   delivery: DeliveryForm;
   card: CardSummary | null;
+  /** One-off message shown in the modal (e.g. card lost after a reload). */
+  notice?: string | null;
 }
 
 export const initialCheckoutState: CheckoutState = {
@@ -35,7 +37,14 @@ const checkoutSlice = createSlice({
       state.quantity = 1;
       state.step = 'details';
     },
+    /** The full card only lives in memory: after a reload it must be typed again. */
+    requireCardAgain(state) {
+      state.step = 'details';
+      state.card = null;
+      state.notice = 'Por seguridad, vuelve a ingresar los datos de tu tarjeta';
+    },
     saveDetails(state, action: PayloadAction<{ delivery: DeliveryForm; card: CardSummary }>) {
+      state.notice = null;
       state.delivery = action.payload.delivery;
       state.card = action.payload.card;
       state.step = 'summary';
@@ -43,6 +52,7 @@ const checkoutSlice = createSlice({
     /** Leaves the modal: delivery data (also the draft being typed) is kept, card data is dropped. */
     closeCheckout(state, action: PayloadAction<{ delivery?: DeliveryForm } | undefined>) {
       if (action.payload?.delivery) state.delivery = action.payload.delivery;
+      state.notice = null;
       state.step = 'product';
       state.card = null;
     },
@@ -60,6 +70,6 @@ const checkoutSlice = createSlice({
   },
 });
 
-export const { startCheckout, saveDetails, closeCheckout, setQuantity, goToStep, resetCheckout } =
+export const { startCheckout, requireCardAgain, saveDetails, closeCheckout, setQuantity, goToStep, resetCheckout } =
   checkoutSlice.actions;
 export const checkoutReducer = checkoutSlice.reducer;

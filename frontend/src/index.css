@@ -100,3 +100,4 @@ body {
   background: transparent;
   color: var(--color-primary);
 }
+.notice--info { border-left: 4px solid var(--color-primary); }

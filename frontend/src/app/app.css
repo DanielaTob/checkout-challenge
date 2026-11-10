@@ -31,8 +31,7 @@
 
 /* ---------- Progress stepper ---------- */
 .progress__list {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
   gap: 6px;
   margin: 0;
   padding: 6px;
@@ -42,6 +41,7 @@
   box-shadow: var(--shadow-sm);
 }
 .progress__step {
+  flex: 1 1 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,6 +84,13 @@
 .progress__step--done .progress__index {
   background: var(--color-accent);
   color: var(--color-on-accent);
+}
+
+/* Phones: the current step gets room for its full label. */
+@media (max-width: 639px) {
+  .progress__step--current {
+    flex-grow: 2.4;
+  }
 }
 
 /* Very narrow phones: keep numbers, hide labels of non-current steps. */

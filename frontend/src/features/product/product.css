@@ -28,14 +28,6 @@
     box-shadow var(--dur) var(--ease),
     transform var(--dur) var(--ease);
 }
-.product-card:hover {
-  box-shadow: var(--shadow);
-  transform: translateY(-2px);
-}
-.product-card--skeleton:hover {
-  box-shadow: var(--shadow-sm);
-  transform: none;
-}
 
 .product-card__media {
   position: relative;
@@ -141,5 +133,16 @@
 @keyframes badge-pop {
   50% {
     transform: scale(1.12);
+  }
+}
+
+@media (hover: hover) {
+  .product-card:hover {
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+  }
+  .product-card--skeleton:hover {
+    box-shadow: var(--shadow-sm);
+    transform: none;
   }
 }

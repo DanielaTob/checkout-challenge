@@ -69,9 +69,6 @@
 .field__input::placeholder {
   color: #8a8a84;
 }
-.field__input:hover {
-  border-color: #cfccc2;
-}
 .field__input:focus-visible {
   outline: none;
   border-color: var(--color-focus);
@@ -129,4 +126,10 @@
   width: 46px;
   height: 30px;
   border-radius: 6px;
+}
+
+@media (hover: hover) {
+  .field__input:hover {
+    border-color: #cfccc2;
+  }
 }

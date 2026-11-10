@@ -122,24 +122,14 @@ h3 {
   color: var(--color-on-accent);
   box-shadow: 0 1px 0 rgb(17 17 17 / 0.08);
 }
-.button--primary:hover:not(:disabled) {
-  background: var(--color-accent-hover);
-}
 .button--secondary {
   background: var(--color-surface);
   color: var(--color-text);
   border-color: var(--color-border);
 }
-.button--secondary:hover:not(:disabled) {
-  background: var(--color-surface-muted);
-}
 .button--text {
   background: transparent;
   color: var(--color-muted);
-}
-.button--text:hover:not(:disabled) {
-  color: var(--color-text);
-  background: var(--color-surface-muted);
 }
 .button--block {
   width: 100%;
@@ -240,5 +230,18 @@ h3 {
   .result__icon--pending {
     animation-duration: 2s !important;
     animation-iteration-count: infinite !important;
+  }
+}
+
+@media (hover: hover) {
+  .button--primary:hover:not(:disabled) {
+    background: var(--color-accent-hover);
+  }
+  .button--secondary:hover:not(:disabled) {
+    background: var(--color-surface-muted);
+  }
+  .button--text:hover:not(:disabled) {
+    color: var(--color-text);
+    background: var(--color-surface-muted);
   }
 }

@@ -47,9 +47,6 @@
   cursor: pointer;
   transition: background-color var(--dur) var(--ease);
 }
-.modal__close:hover {
-  background: var(--color-surface-muted);
-}
 .modal__close:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
@@ -101,5 +98,11 @@
   }
   .modal__footer {
     padding: 14px 24px 18px;
+  }
+}
+
+@media (hover: hover) {
+  .modal__close:hover {
+    background: var(--color-surface-muted);
   }
 }

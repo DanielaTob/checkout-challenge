@@ -1,6 +1,6 @@
 # 004 · Tareas
 
-- [ ] T0 — Probar el sandbox con curl: merchants, tokens, transactions, estado; anotar endpoints y tarjetas de prueba en `docs/adr/0003-contrato-pasarela.md`
+- [x] T0 — Probar el sandbox con curl: merchants, tokens, transactions, estado; anotar endpoints y tarjetas de prueba en `docs/adr/0003-contrato-pasarela.md`
 - [ ] T1 — Migración (`idempotency_key`, `shipping`, `failure_reason`, email único) (AC-004-02)
 - [ ] T2 — Customer: dominio, repo, `CreateCustomer`, controlador (AC-004-01)
 - [ ] T3 — `validateCard` en dominio y `integritySignature` (AC-004-05, AC-004-06)

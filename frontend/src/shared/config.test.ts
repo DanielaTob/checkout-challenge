@@ -1,7 +1,7 @@
 import { API_URL, normalizeBaseUrl } from './config';
 
 describe('config', () => {
-  it('AC-001-06 reads the API base URL injected at build time', () => {
+  it('AC-001-06 AC-006-10 reads the API base URL injected at build time', () => {
     expect(API_URL).toBe('http://api.test');
   });
 

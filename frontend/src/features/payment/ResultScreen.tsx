@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { CopyableReference } from '../../shared/ui/CopyableReference';
 import { formatCop } from '../../shared/utils/money';
 import { goToStep, resetCheckout } from '../checkout/checkoutSlice';
 import { fetchProducts } from '../product/productsSlice';
@@ -23,7 +24,9 @@ function TransactionDetails({ transaction }: { transaction: Transaction }) {
     <dl className="result__details">
       <div>
         <dt>Referencia</dt>
-        <dd>{transaction.reference}</dd>
+        <dd>
+          <CopyableReference value={transaction.reference} />
+        </dd>
       </div>
       <div>
         <dt>Total</dt>
@@ -96,7 +99,9 @@ export function ResultScreen() {
         ) : (
           <p>Estamos confirmando el pago con la pasarela. No cierres esta página.</p>
         )}
-        <p className="result__muted">Referencia {transaction.reference}</p>
+        <p className="result__muted result__reference">
+          Referencia <CopyableReference value={transaction.reference} />
+        </p>
       </section>
     );
   }

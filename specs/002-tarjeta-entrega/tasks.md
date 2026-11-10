@@ -1,7 +1,7 @@
 # 002 · Tareas
 
 - [x] T1 — `luhn`, `onlyDigits`, `formatCardNumber` (AC-002-01, AC-002-03)
-- [ ] T2 — `detectBrand` + `BrandLogo` (AC-002-02)
+- [x] T2 — `detectBrand` + `BrandLogo` (AC-002-02)
 - [ ] T3 — `isValidExpiry`, `isValidCvc`, `isValidHolder` (AC-002-04, AC-002-05, AC-002-06)
 - [ ] T4 — Validadores de entrega (AC-002-07)
 - [ ] T5 — `cardSession` slice no persistido + acciones en `checkoutSlice` (AC-002-09)

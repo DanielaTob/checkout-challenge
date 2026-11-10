@@ -9,14 +9,19 @@ import {
   REGISTER,
   REHYDRATE,
 } from 'redux-persist';
-import storage from 'redux-persist/lib/storage';
 import { checkoutReducer } from '../features/checkout/checkoutSlice';
+import { createLocalStorage } from './storage';
 
 export const rootReducer = combineReducers({ checkout: checkoutReducer });
 
 // Only whitelisted slices are persisted. Card number and CVC must never reach any slice
 // that is persisted (see spec 005); they live only in component state.
-const persistConfig = { key: 'checkout-app', version: 1, storage, whitelist: ['checkout'] };
+export const persistConfig = {
+  key: 'checkout-app',
+  version: 1,
+  storage: createLocalStorage(),
+  whitelist: ['checkout'],
+};
 
 export const makeStore = () => {
   const store = configureStore({

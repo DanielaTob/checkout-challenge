@@ -22,6 +22,8 @@ export function ProductList({ onPay = () => {} }: Props) {
     return (
       <div className="product-list" role="status" aria-busy="true" aria-label="Cargando productos">
         <ProductSkeleton />
+        <ProductSkeleton />
+        <ProductSkeleton />
       </div>
     );
   }

@@ -33,7 +33,7 @@ describe('ProductList', () => {
     expect(within(card).getByRole('img', { name: 'Audífonos inalámbricos' })).toHaveAttribute('src', '/images/headphones.webp');
     expect(within(card).getByText('Over-ear con cancelación de ruido')).toBeInTheDocument();
     expect(plain(within(card).getByTestId('price').textContent)).toBe('$ 249.900');
-    expect(within(card).getByText('10 disponibles')).toBeInTheDocument();
+    expect(within(card).getByText('Quedan 10')).toBeInTheDocument();
   });
 
   it('AC-001-07 shows a loading skeleton while the API is answering', () => {
@@ -59,6 +59,15 @@ describe('ProductList', () => {
     expect(within(soldOut).getByRole('button', { name: 'Pay with credit card' })).toBeDisabled();
     const available = screen.getByRole('article', { name: 'Audífonos inalámbricos' });
     expect(within(available).getByRole('button', { name: 'Pay with credit card' })).toBeEnabled();
+  });
+
+  it('AC-001-06 highlights low stock (5 or less) with an amber badge', async () => {
+    getJson.mockResolvedValue([{ ...headphones, stock: 5 }, { ...watch, stock: 6 }]);
+    renderWithStore(<ProductList />);
+    const low = within(await screen.findByRole('article', { name: 'Audífonos inalámbricos' })).getByText('Quedan 5');
+    expect(low).toHaveClass('badge', 'badge--low');
+    const ok = within(screen.getByRole('article', { name: 'Reloj deportivo' })).getByText('Quedan 6');
+    expect(ok).not.toHaveClass('badge--low');
   });
 
   it('shows an empty-state message (not an error) when there are no products', async () => {

@@ -6,7 +6,7 @@
 | [002-tarjeta-entrega](002-tarjeta-entrega/spec.md) | Modal de tarjeta (Luhn, fecha, CVC, marca) y datos de entrega | Implementada |
 | [003-resumen-pago](003-resumen-pago/spec.md) | Cotización en backend y backdrop de resumen | Implementada |
 | [004-transaccion-pasarela](004-transaccion-pasarela/spec.md) | Clientes, transacción, pasarela, entrega, stock y pantalla de resultado | Implementada |
-| [005-resiliencia](005-resiliencia/spec.md) | Recuperar el paso tras un refresh, idempotencia y timeouts | Backend implementado (front pendiente) |
+| [005-resiliencia](005-resiliencia/spec.md) | Recuperar el paso tras un refresh, idempotencia y timeouts | Implementada |
 | 006-despliegue | AWS, HTTPS y headers | Pendiente |
 
 ## Contrato de API (visión global)

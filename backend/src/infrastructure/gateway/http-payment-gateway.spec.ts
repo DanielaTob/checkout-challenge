@@ -208,4 +208,49 @@ describe('HttpPaymentGateway', () => {
       },
     });
   });
+
+  it('AC-005-11 every request carries an abort signal so a silent gateway is cut at the timeout', async () => {
+    const { gateway, fetchFn } = setup(() => json(200, { data: {} }));
+    await gateway.getAcceptanceTokens();
+    expect(sentInit(fetchFn)[1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('AC-005-12 a transient failure reading the status is retried up to 2 times', async () => {
+    const ok200 = () => json(200, { data: { id: 'gw-1', status: 'APPROVED' } });
+    const { gateway, fetchFn } = setup(
+      () => json(503, {}),
+      () => Promise.reject(new TypeError('fetch failed')),
+      ok200,
+    );
+    const r = await gateway.getTransaction('gw-1');
+    expect(r.ok && r.value.status).toBe('APPROVED');
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('AC-005-12 the status read gives up after 3 attempts and a 4xx is not retried', async () => {
+    const down = setup(
+      () => json(503, {}),
+      () => json(502, {}),
+      () => json(500, {}),
+    );
+    const r = await down.gateway.getTransaction('gw-1');
+    expect(!r.ok && r.error.code).toBe('GATEWAY_ERROR');
+    expect(down.fetchFn).toHaveBeenCalledTimes(3);
+
+    const notFound = setup(() => json(404, {}));
+    await notFound.gateway.getTransaction('gw-1');
+    expect(notFound.fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['tokenizing', (g: HttpPaymentGateway) => g.tokenizeCard(card)],
+    [
+      'creating the transaction',
+      (g: HttpPaymentGateway) => g.createTransaction(paymentRequest),
+    ],
+  ])('AC-005-12 %s is never retried', async (_, call) => {
+    const { gateway, fetchFn } = setup(() => json(503, {}));
+    await call(gateway);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
 });

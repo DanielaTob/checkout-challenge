@@ -14,6 +14,7 @@ import {
 } from '../../domain/shared/domain-error';
 import { err, ok, type Result } from '../../domain/shared/result';
 import type { TransactionStatus } from '../../domain/transaction/transaction-status';
+import { retry } from './retry';
 
 export interface GatewayConfig {
   readonly baseUrl: string;
@@ -25,6 +26,8 @@ export interface GatewayConfig {
 }
 
 export const DEFAULT_GATEWAY_TIMEOUT_MS = 8000;
+/** Extra attempts for transient failures of the status read (GET only). */
+export const STATUS_READ_RETRIES = 2;
 
 export type FetchFn = typeof fetch;
 
@@ -144,10 +147,15 @@ export class HttpPaymentGateway implements PaymentGateway {
   async getTransaction(
     id: string,
   ): Promise<Result<GatewayTransaction, DomainError>> {
-    const res = await this.call(
-      'get-transaction',
-      'GET',
-      `/transactions/${encodeURIComponent(id)}`,
+    // Transient failures (5xx, timeout, network) are retried; a 4xx answer is not.
+    const res = await retry(
+      () =>
+        this.call(
+          'get-transaction',
+          'GET',
+          `/transactions/${encodeURIComponent(id)}`,
+        ),
+      STATUS_READ_RETRIES,
     );
     if (!res.ok) return res;
     if (res.value.status !== 200)

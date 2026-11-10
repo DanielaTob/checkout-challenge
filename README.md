@@ -393,24 +393,80 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 ## Estructura
 
 ```
-backend/    API NestJS (domain / application / infrastructure)
-frontend/   SPA React
-specs/      Spec-Driven Development: spec.md · plan.md · tasks.md por funcionalidad
-scripts/    verify.sh (puerta de calidad) · trace.ts (matriz AC → tests)
-docs/       contexto y ADRs
+backend/
+  src/domain/          entidades, reglas puras, puertos (interfaces), Result y DomainError
+  src/application/     casos de uso (devuelven Result)
+  src/infrastructure/  adaptadores: http/ (controladores, DTOs), prisma/, gateway/, config/, módulos Nest
+  src/test/            dobles en memoria de los puertos y helpers de tests
+  prisma/              schema, migraciones, seed, reset-demo
+frontend/src/
+  app/                 store, persistencia, rehidratación por paso
+  features/            product/, checkout/, payment/ (slice + componentes + tests)
+  shared/              ui/, utils/ (Luhn, marca, dinero), api/
+specs/NNN-nombre/      spec.md · plan.md · tasks.md por funcionalidad
+docs/                  contexto.md · adr/ · postman.json
+infra/                 template.yaml (CloudFormation)
+scripts/               verify.sh · trace.ts · build-lambda.sh · deploy.sh
+.claude/skills/        skills de proyecto: spec · ship · verify
+AGENTS.md              constitución para agentes de IA (CLAUDE.md la importa)
 ```
 
 ## Desarrollo
 
+Requisitos: Node 24 (la versión de la CI) y npm; una base PostgreSQL (Neon) y las llaves de prueba del sandbox de la pasarela. `gitleaks` es opcional en local (la CI lo corre siempre).
+
 ```bash
-npm install                      # raíz: husky + tsx
-npm install --prefix backend
+npm install                      # raíz: husky (pre-commit) + tsx
+npm install --prefix backend     # genera el cliente de Prisma
 npm install --prefix frontend
-cp backend/.env.example backend/.env      # completar valores
-cp frontend/.env.example frontend/.env
-export FORBIDDEN_WORD=...        # requerido por scripts/verify.sh
-scripts/verify.sh
+cp backend/.env.example backend/.env      # completar valores (nunca se commitea)
+cp frontend/.env.example frontend/.env    # VITE_API_URL
 ```
+
+Variables del backend (`backend/.env.example`): `DATABASE_URL` (pooled), `DIRECT_DATABASE_URL` (sin pooler, solo migraciones), `GATEWAY_BASE_URL`, `GATEWAY_PUBLIC_KEY`, `GATEWAY_PRIVATE_KEY`, `GATEWAY_INTEGRITY_SECRET`, `GATEWAY_EVENTS_SECRET` (preparada, sin uso), `BASE_FEE_IN_CENTS`, `DELIVERY_FEE_IN_CENTS` y `CORS_ORIGINS`. Se validan al arrancar, y si falta alguna la API no levanta (el error dice qué nombres faltan, nunca los valores).
+
+```bash
+cd backend && npm run start:dev     # API en http://localhost:3000 (Swagger en /docs)
+cd frontend && npm run dev          # SPA en http://localhost:5173
+```
+
+### Base de datos y datos de demo (`db:reset-demo`)
+
+```bash
+cd backend
+npm run db:deploy        # aplica las migraciones pendientes (usa DIRECT_DATABASE_URL)
+npm run db:seed          # crea los productos de ejemplo que falten; no toca el stock existente
+npm run db:reset-demo    # deja la demo como recién sembrada (ver abajo)
+```
+
+`db:reset-demo` sirve para limpiar después de probar pagos en el sandbox. En **una sola transacción de BD**:
+
+1. Borra **todas** las entregas, transacciones y clientes (en ese orden, por las claves foráneas).
+2. Repone el stock de los productos del seed a sus valores iniciales.
+3. No borra productos.
+
+> ⚠️ Es destructivo y actúa sobre la base de `DATABASE_URL`. La demo usa una sola base de Neon para dev y prod, así que también vacía los pagos hechos desde la app desplegada. Solo hay datos de sandbox, pero úsalo a conciencia.
+
+El seed **no** repone stock a propósito (`upsert` con `update: {}`), para no deshacer ventas al redesplegar; por eso existe `db:reset-demo`.
+
+### Puerta de calidad
+
+```bash
+export FORBIDDEN_WORD=...          # palabra que no puede aparecer en el repo; nunca se escribe en un archivo
+scripts/verify.sh                  # lint, typecheck, tests + cobertura, build, npm audit (back y front), gitleaks y nombre prohibido
+VERIFY_FAST=1 scripts/verify.sh    # variante del pre-commit (sin build ni audit)
+npx tsx scripts/trace.ts           # matriz AC → tests
+```
+
+### Despliegue
+
+```bash
+aws configure                      # credenciales de la cuenta (región us-east-2)
+scripts/build-lambda.sh            # bundle de la Lambda en .build/ (poda dependencias no usadas)
+scripts/deploy.sh                  # CloudFormation (infra/template.yaml): Lambda + API Gateway + S3 + CloudFront, migraciones, seed, subida de la SPA y smoke test
+```
+
+`deploy.sh` lee `backend/.env.production`, que no se commitea. Las decisiones de infraestructura están en [`docs/adr/0001-neon-y-lambda.md`](docs/adr/0001-neon-y-lambda.md).
 
 ## Git workflow
 

@@ -25,7 +25,7 @@ Si el usuario recarga la página, la app recupera el paso en el que iba.
 | Base de datos | PostgreSQL + Prisma, con seed de productos (no hay endpoint para crear productos) |
 | Tests | Jest, cobertura > 80 % en front y back |
 | Docs API | Swagger (`@nestjs/swagger`) en `/docs` |
-| Nube | AWS: front en S3 + CloudFront; back en Lambda (fuera de VPC) + API Gateway; BD en Neon (branches `dev` y `prod`, SSL). Plan B: back en Render |
+| Nube | AWS: front en S3 + CloudFront; back en Lambda (fuera de VPC) + API Gateway; BD en Neon (una sola branch para dev y prod, SSL). Plan B: back en Render |
 
 ## Reglas no negociables (constitución)
 
@@ -122,6 +122,8 @@ npx tsx scripts/trace.ts --shipped # solo specs con tasks.md completo (lo usa la
 cd backend && npm run test:cov
 cd frontend && npm run test:cov
 cd backend && npm run db:migrate && npm run db:seed
+scripts/build-lambda.sh            # bundle de la Lambda en .build/ (poda peers y motores no usados)
+scripts/deploy.sh                  # despliegue completo con CloudFormation (requiere aws configure y backend/.env.production)
 ```
 
 ## Lo que un agente NO debe hacer

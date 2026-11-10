@@ -16,3 +16,11 @@ describe('persistence', () => {
     expect(persistConfig.whitelist).not.toContain('products');
   });
 });
+
+describe('store persistence wiring', () => {
+  it('uses the local adapter (a plain object with functions), not the CommonJS default import', async () => {
+    const { persistConfig } = await import('./store');
+    expect(typeof persistConfig.storage.getItem).toBe('function');
+    expect(typeof persistConfig.storage.setItem).toBe('function');
+  });
+});

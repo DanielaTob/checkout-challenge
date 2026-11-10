@@ -14,7 +14,10 @@ import { checkoutReducer } from '../features/checkout/checkoutSlice';
 import { paymentReducer } from '../features/payment/paymentSlice';
 import { quoteReducer } from '../features/payment/quoteSlice';
 import { productsReducer } from '../features/product/productsSlice';
+import { migratePersistedState, PERSIST_VERSION } from './persistedState';
 import { createLocalStorage } from './storage';
+
+export { PERSIST_VERSION };
 
 export const rootReducer = combineReducers({
   checkout: checkoutReducer,
@@ -28,9 +31,12 @@ export const rootReducer = combineReducers({
 // that is persisted (see spec 005); they live only in component state.
 export const persistConfig = {
   key: 'checkout-app',
-  version: 1,
+  version: PERSIST_VERSION,
   storage: createLocalStorage(),
-  whitelist: ['checkout'],
+  // checkout: step, product, quantity, delivery and brand+last4. payment: idempotency key and result.
+  // Never cardSession (full number/CVC), products or quote (always fetched fresh).
+  whitelist: ['checkout', 'payment'],
+  migrate: migratePersistedState,
 };
 
 export const makeStore = () => {

@@ -41,7 +41,7 @@ Lo leen los agentes al iniciar una sesión. Resume los requisitos de la prueba y
 | Tema | Decisión | ADR |
 |---|---|---|
 | BD | Neon (Postgres serverless), una sola branch para dev y prod. Conexión con `sslmode=require` | [0001](adr/0001-neon-y-lambda.md) |
-| Back | NestJS en AWS Lambda con `@codegenie/serverless-express`, detrás de API Gateway (HTTP API). Lambda **fuera de la VPC** para tener salida a internet hacia la pasarela y Neon | [0001](adr/0001-neon-y-lambda.md) |
+| Back | NestJS en AWS Lambda (`us-east-2`) con `@codegenie/serverless-express`, detrás de API Gateway (HTTP API). Lambda **fuera de la VPC** para tener salida a internet hacia la pasarela y Neon (`us-east-1`) | [0001](adr/0001-neon-y-lambda.md) |
 | Front | Build de Vite en S3 privado + CloudFront (OAC, HTTPS) | [0001](adr/0001-neon-y-lambda.md) |
 | Plan B | Si a las 9 p. m. del día 1 el back en Lambda no funciona, se despliega en Render (misma BD Neon) | [0001](adr/0001-neon-y-lambda.md) |
 | Herramientas | `gitleaks` y `awscli` instalados con brew; las credenciales de AWS las configura la persona con `aws configure` | — |

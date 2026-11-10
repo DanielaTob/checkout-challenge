@@ -17,6 +17,7 @@ Hay dos días de plazo. RDS dentro de una VPC obliga a poner NAT Gateway para qu
   La Lambda queda **fuera de la VPC**: tiene salida directa a internet hacia la pasarela y Neon.
   La instancia de Nest se cachea entre invocaciones para reducir el cold start.
 - **Front:** build estático de Vite en un bucket S3 privado servido por CloudFront (OAC, HTTPS, headers de seguridad).
+- **Región:** todo el stack de AWS va en **`us-east-2`**: la cuenta (AWS Builder ID nueva) tiene una SCP que solo permite esa región para servicios regionales; IAM, STS y CloudFront son globales. Neon se queda en `us-east-1`; la latencia entre ambas regiones (~10–15 ms por consulta) es aceptable para la demo.
 - **Plan B:** si a las 9 p. m. del día 1 el back en Lambda no responde, se despliega en Render contra la misma BD Neon.
 
 ## Consecuencias

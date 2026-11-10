@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  Checkout challenge - NestJS API on Lambda (outside VPC) behind an HTTP API,
+  Checkout challenge (deployed in us-east-2) - NestJS API on Lambda (outside VPC) behind an HTTP API,
   React SPA on a private S3 bucket served by CloudFront (OAC, HTTPS, security headers).
 
 Parameters:

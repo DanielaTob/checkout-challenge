@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 STACK="${STACK_NAME:-checkout-challenge}"
-REGION="${AWS_REGION:-us-east-1}"
+REGION="${AWS_REGION:-us-east-2}"
 ENV_FILE="backend/.env.production"
 export AWS_REGION="$REGION" AWS_PAGER=""
 

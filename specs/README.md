@@ -4,9 +4,9 @@
 |---|---|---|
 | [001-catalogo-stock](001-catalogo-stock/spec.md) | Productos, stock, pantalla de producto | Aprobada |
 | [002-tarjeta-entrega](002-tarjeta-entrega/spec.md) | Modal de tarjeta (Luhn, fecha, CVC, marca) y datos de entrega | Aprobada |
-| [003-resumen-pago](003-resumen-pago/spec.md) | Cotización en backend y backdrop de resumen | Aprobada |
-| [004-transaccion-pasarela](004-transaccion-pasarela/spec.md) | Clientes, transacción, pasarela, entrega, stock y pantalla de resultado | Aprobada |
-| [005-resiliencia](005-resiliencia/spec.md) | Recuperar el paso tras un refresh, idempotencia y timeouts | Aprobada |
+| [003-resumen-pago](003-resumen-pago/spec.md) | Cotización en backend y backdrop de resumen | Backend implementado (front pendiente) |
+| [004-transaccion-pasarela](004-transaccion-pasarela/spec.md) | Clientes, transacción, pasarela, entrega, stock y pantalla de resultado | Backend implementado (front pendiente) |
+| [005-resiliencia](005-resiliencia/spec.md) | Recuperar el paso tras un refresh, idempotencia y timeouts | Backend implementado (front pendiente) |
 | 006-despliegue | AWS, HTTPS y headers | Pendiente |
 
 ## Contrato de API (visión global)
@@ -19,6 +19,7 @@
 | POST | `/customers` | clientes | 004 | 201, 200 (ya existía), 400 |
 | POST | `/transactions` | transacciones | 004 | 201, 200 (misma Idempotency-Key), 400, 404, 409, 422, 502 |
 | GET | `/transactions/:id` | transacciones | 004 | 200, 400, 404, 502 |
+| GET | `/transactions/by-key/:idempotencyKey` | transacciones | 005 | 200, 400, 404, 502 |
 | GET | `/deliveries/:id` | entregas | 004 | 200, 400, 404 |
 | GET | `/health` | — | — | 200 |
 

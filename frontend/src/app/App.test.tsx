@@ -11,7 +11,8 @@ jest.mock('../shared/api/http', () => ({
 describe('App', () => {
   it('renders the current step from the store and the product list', async () => {
     renderWithStore(<App />, { checkout: { ...initialCheckoutState, step: 'details' } });
-    expect(screen.getByRole('heading', { name: 'Checkout' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Ceiba Shop' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Progreso del pago' })).toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveAttribute('data-step', 'details');
     expect(await screen.findByText('No hay productos disponibles')).toBeInTheDocument();
   });

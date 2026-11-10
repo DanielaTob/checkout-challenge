@@ -41,9 +41,9 @@ export function ProductList({ onPay = () => {} }: Props) {
 
   return (
     <ul className="product-list">
-      {items.map((p) => (
+      {items.map((p, i) => (
         <li key={p.id}>
-          <ProductCard product={p} onPay={onPay} />
+          <ProductCard product={p} onPay={onPay} priority={i === 0} />
         </li>
       ))}
     </ul>

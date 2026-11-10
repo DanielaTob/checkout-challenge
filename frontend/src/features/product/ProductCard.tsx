@@ -1,17 +1,19 @@
 import { formatCop } from '../../shared/utils/money';
+import { ProductImage } from './ProductImage';
 import type { Product } from './types';
 
 interface Props {
   product: Product;
   onPay: (product: Product) => void;
+  priority?: boolean;
 }
 
-export function ProductCard({ product, onPay }: Props) {
+export function ProductCard({ product, onPay, priority = false }: Props) {
   const soldOut = product.stock <= 0;
   const titleId = `product-${product.id}-name`;
   return (
     <article className="product-card" aria-labelledby={titleId}>
-      <img className="product-card__image" src={product.imageUrl} alt={product.name} />
+      <ProductImage src={product.imageUrl} alt={product.name} priority={priority} />
       <div className="product-card__body">
         <h2 id={titleId} className="product-card__name">
           {product.name}

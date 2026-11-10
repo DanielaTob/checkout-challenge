@@ -65,6 +65,11 @@
   font-weight: 600;
 }
 
+/* Same box as the image, shown when it fails to load (no layout shift). */
+.product-card__image--placeholder {
+  background: repeating-linear-gradient(45deg, #e8ebf3 0 12px, #eef1f7 12px 24px);
+}
+
 /* Skeleton */
 .skeleton {
   border-radius: 6px;

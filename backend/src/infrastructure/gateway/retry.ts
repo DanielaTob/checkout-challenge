@@ -7,8 +7,10 @@ import type { Result } from '../../domain/shared/result';
 export const retry = async <T, E>(
   fn: () => Promise<Result<T, E>>,
   retries: number,
+  canRetry: () => boolean = () => true,
 ): Promise<Result<T, E>> => {
   let result = await fn();
-  for (let i = 0; i < retries && !result.ok; i++) result = await fn();
+  for (let i = 0; i < retries && !result.ok && canRetry(); i++)
+    result = await fn();
   return result;
 };

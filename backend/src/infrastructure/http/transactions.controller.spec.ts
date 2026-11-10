@@ -194,6 +194,17 @@ describe('TransactionsController (HTTP)', () => {
       .expect(400);
   });
 
+  it('AC-005-14 POST /transactions answers 201 PENDING when the gateway is too slow to finish within the budget', async () => {
+    const create = ctx.gateway.createTransaction.getMockImplementation()!;
+    ctx.gateway.createTransaction.mockImplementationOnce((r, o) => {
+      ctx.clock.advance(14500);
+      return create(r, o);
+    });
+    const res = await post(body()).expect(201);
+    expect((res.body as Body).status).toBe('PENDING');
+    expect(ctx.gateway.getTransaction).not.toHaveBeenCalled();
+  });
+
   it('documents the transaction routes in Swagger', async () => {
     const res = await request(app.getHttpServer())
       .get('/docs-json')

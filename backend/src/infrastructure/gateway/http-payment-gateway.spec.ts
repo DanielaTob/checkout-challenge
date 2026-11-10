@@ -253,4 +253,38 @@ describe('HttpPaymentGateway', () => {
     await call(gateway);
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
+
+  it('AC-005-14 a per-call timeoutMs shorter than the configured timeout aborts sooner', async () => {
+    const hang: FetchFn = (_url, init) =>
+      new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener('abort', () =>
+          reject(init.signal?.reason as Error),
+        );
+      });
+    const gateway = new HttpPaymentGateway(
+      { ...config, timeoutMs: 60000 },
+      hang,
+    );
+    const started = Date.now();
+    const r = await gateway.tokenizeCard(card, { timeoutMs: 20 });
+    expect(!r.ok && r.error.message).toBe(
+      'The payment gateway did not answer in time',
+    );
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it('AC-005-14 the status read does not retry once its time limit is spent', async () => {
+    const late503: FetchFn = () =>
+      new Promise((resolve) =>
+        setTimeout(() => resolve(new Response('{}', { status: 503 })), 15),
+      );
+    const fetchFn = jest.fn(late503);
+    const gateway = new HttpPaymentGateway(
+      { ...config, timeoutMs: 1000 },
+      fetchFn,
+    );
+    const r = await gateway.getTransaction('gw-1', { timeoutMs: 5 });
+    expect(!r.ok && r.error.code).toBe('GATEWAY_ERROR');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
 });

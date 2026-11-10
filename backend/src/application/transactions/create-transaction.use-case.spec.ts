@@ -41,15 +41,20 @@ describe('CreateTransaction', () => {
   it('AC-004-07 charges the gateway with the token, reference, total, COP and customer email', async () => {
     const f = checkoutFixture();
     await f.createTransaction.execute(anInput());
-    expect(f.gateway.tokenizeCard).toHaveBeenCalledWith(anInput().card);
-    expect(f.gateway.createTransaction).toHaveBeenCalledWith({
-      acceptance: { acceptanceToken: 'acc', personalDataAuthToken: 'pers' },
-      cardToken: 'tok_4242',
-      reference: 'TX-1',
-      amountInCents: f.product.priceInCents * 2 + 1300000,
-      currency: 'COP',
-      customerEmail: f.customer.email,
+    expect(f.gateway.tokenizeCard).toHaveBeenCalledWith(anInput().card, {
+      timeoutMs: 15000,
     });
+    expect(f.gateway.createTransaction).toHaveBeenCalledWith(
+      {
+        acceptance: { acceptanceToken: 'acc', personalDataAuthToken: 'pers' },
+        cardToken: 'tok_4242',
+        reference: 'TX-1',
+        amountInCents: f.product.priceInCents * 2 + 1300000,
+        currency: 'COP',
+        customerEmail: f.customer.email,
+      },
+      { timeoutMs: 15000 },
+    );
   });
 
   it('AC-004-09 when the gateway approves: APPROVED with gateway id, delivery created and stock decremented', async () => {

@@ -15,7 +15,8 @@ export interface PollOptions {
 export const DEFAULT_POLL: PollOptions = { attempts: 10, intervalMs: 1000 };
 
 /**
- * Reads the gateway status every `intervalMs` up to `attempts` times until it is final.
+ * Reads the gateway status every `intervalMs` up to `attempts` times until it is final
+ * or the deadline arrives.
  * Never fails: a read error stops polling and keeps the last known status (PENDING),
  * which GET /transactions/:id resolves later.
  */
@@ -26,17 +27,25 @@ export class PollTransactionStatus {
     private readonly options: PollOptions = DEFAULT_POLL,
   ) {}
 
+  /** `deadline` (epoch ms): stop when another interval no longer fits before it. */
   async execute(
     initial: GatewayTransaction,
+    deadline = Infinity,
   ): Promise<Result<GatewayTransaction, DomainError>> {
+    const { attempts, intervalMs } = this.options;
+    const now = () => this.clock.now().getTime();
     let latest = initial;
     for (
       let attempt = 0;
-      attempt < this.options.attempts && !isFinal(latest.status);
+      attempt < attempts &&
+      !isFinal(latest.status) &&
+      now() + intervalMs < deadline;
       attempt++
     ) {
-      await this.clock.sleep(this.options.intervalMs);
-      const read = await this.gateway.getTransaction(initial.id);
+      await this.clock.sleep(intervalMs);
+      const read = await this.gateway.getTransaction(initial.id, {
+        timeoutMs: deadline - now(),
+      });
       if (!read.ok) break;
       latest = read.value;
     }

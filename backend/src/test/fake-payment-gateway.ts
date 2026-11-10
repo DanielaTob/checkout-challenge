@@ -2,6 +2,7 @@ import type { CardInput } from '../domain/payment/card';
 import type {
   AcceptanceTokens,
   CardToken,
+  GatewayCallOptions,
   GatewayPaymentRequest,
   GatewayTransaction,
   PaymentGateway,
@@ -15,25 +16,30 @@ type R<T> = Promise<Result<T, DomainError>>;
 
 /** Scriptable PaymentGateway double: every method is a jest.fn with a happy default. */
 export class FakePaymentGateway implements PaymentGateway {
-  readonly getAcceptanceTokens = jest.fn((): R<AcceptanceTokens> =>
+  readonly getAcceptanceTokens = jest.fn<
+    R<AcceptanceTokens>,
+    [GatewayCallOptions?]
+  >(() =>
     Promise.resolve(
       ok({ acceptanceToken: 'acc', personalDataAuthToken: 'pers' }),
     ),
   );
-  readonly tokenizeCard = jest.fn((card: CardInput): R<CardToken> =>
-    Promise.resolve(ok({ id: `tok_${card.number.slice(-4)}` })),
+  readonly tokenizeCard = jest.fn<
+    R<CardToken>,
+    [CardInput, GatewayCallOptions?]
+  >((card) => Promise.resolve(ok({ id: `tok_${card.number.slice(-4)}` })));
+  readonly createTransaction = jest.fn<
+    R<GatewayTransaction>,
+    [GatewayPaymentRequest, GatewayCallOptions?]
+  >((req) =>
+    Promise.resolve(
+      ok({ id: `gw-${req.reference}`, status: 'PENDING', statusMessage: null }),
+    ),
   );
-  readonly createTransaction = jest.fn(
-    (req: GatewayPaymentRequest): R<GatewayTransaction> =>
-      Promise.resolve(
-        ok({
-          id: `gw-${req.reference}`,
-          status: 'PENDING',
-          statusMessage: null,
-        }),
-      ),
-  );
-  readonly getTransaction = jest.fn((id: string): R<GatewayTransaction> =>
+  readonly getTransaction = jest.fn<
+    R<GatewayTransaction>,
+    [string, GatewayCallOptions?]
+  >((id) =>
     Promise.resolve(ok({ id, status: 'APPROVED', statusMessage: null })),
   );
 
@@ -54,14 +60,22 @@ export class FakePaymentGateway implements PaymentGateway {
   }
 }
 
+/** Virtual time: sleep() and advance() move now() forward instantly. */
 export class FakeClock implements Clock {
   readonly sleeps: number[] = [];
-  constructor(private readonly date = new Date('2026-11-10T12:00:00Z')) {}
+  private time: number;
+  constructor(start = new Date('2026-11-10T12:00:00Z')) {
+    this.time = start.getTime();
+  }
   now(): Date {
-    return this.date;
+    return new Date(this.time);
+  }
+  advance(ms: number): void {
+    this.time += ms;
   }
   sleep(ms: number): Promise<void> {
     this.sleeps.push(ms);
+    this.advance(ms);
     return Promise.resolve();
   }
 }

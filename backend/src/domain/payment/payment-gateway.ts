@@ -28,17 +28,32 @@ export interface GatewayTransaction {
   readonly statusMessage: string | null;
 }
 
+/** Per-call limit: the adapter uses min(its own timeout, timeoutMs). */
+export interface GatewayCallOptions {
+  readonly timeoutMs?: number;
+}
+
 /**
  * Port to the payment gateway. Every call returns a Result; transport failures,
  * timeouts and unexpected responses are GATEWAY_ERROR.
  */
 export interface PaymentGateway {
-  getAcceptanceTokens(): Promise<Result<AcceptanceTokens, DomainError>>;
-  tokenizeCard(card: CardInput): Promise<Result<CardToken, DomainError>>;
+  getAcceptanceTokens(
+    options?: GatewayCallOptions,
+  ): Promise<Result<AcceptanceTokens, DomainError>>;
+  tokenizeCard(
+    card: CardInput,
+    options?: GatewayCallOptions,
+  ): Promise<Result<CardToken, DomainError>>;
   createTransaction(
     request: GatewayPaymentRequest,
+    options?: GatewayCallOptions,
   ): Promise<Result<GatewayTransaction, DomainError>>;
-  getTransaction(id: string): Promise<Result<GatewayTransaction, DomainError>>;
+  /** Transient failures are retried while the time limit allows it. */
+  getTransaction(
+    id: string,
+    options?: GatewayCallOptions,
+  ): Promise<Result<GatewayTransaction, DomainError>>;
 }
 
 export const PAYMENT_GATEWAY = Symbol('PaymentGateway');

@@ -62,6 +62,7 @@ describe('Card data never leaks', () => {
       // The full card only goes to the gateway's tokenization.
       expect(ctx.gateway.tokenizeCard).toHaveBeenCalledWith(
         expect.objectContaining({ number: NUMBER, cvc: CVC }),
+        expect.anything(),
       );
     } finally {
       await ctx.app.close();

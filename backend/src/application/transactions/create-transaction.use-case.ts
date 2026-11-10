@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { CustomerRepository } from '../../domain/customer/customer.repository';
 import type { Shipping } from '../../domain/delivery/delivery';
 import { type CardInput, validateCard } from '../../domain/payment/card';
-import type { PaymentGateway } from '../../domain/payment/payment-gateway';
+import type {
+  GatewayCallOptions,
+  PaymentGateway,
+} from '../../domain/payment/payment-gateway';
 import type { ProductRepository } from '../../domain/product/product.repository';
 import {
   buildQuote,
@@ -48,9 +51,14 @@ export interface CreateTransactionDeps {
   readonly apply: ApplyTransactionResult;
   readonly refresh: RefreshTransaction;
   readonly newReference?: () => string;
+  /** Total time for the payment request; defaults to PAYMENT_TIME_BUDGET_MS. */
+  readonly budgetMs?: number;
 }
 
 const defaultReference = () => `TX-${randomUUID()}`;
+
+/** Whole POST /transactions stays well below the ~30 s API Gateway limit. */
+export const PAYMENT_TIME_BUDGET_MS = 15000;
 
 /**
  * validate card → product/customer → quote → PENDING (stock checked under lock)
@@ -63,6 +71,8 @@ export class CreateTransaction {
     input: CreateTransactionInput,
   ): Promise<Result<CreatedTransaction, DomainError>> {
     const { products, customers, transactions, fees, clock } = this.deps;
+    const deadline =
+      clock.now().getTime() + (this.deps.budgetMs ?? PAYMENT_TIME_BUDGET_MS);
 
     if (input.idempotencyKey) {
       const existing = await transactions.findByIdempotencyKey(
@@ -112,7 +122,12 @@ export class CreateTransaction {
       return raced ? this.replay(raced, input) : pending;
     }
 
-    const paid = await this.charge(pending.value, customer.email, input.card);
+    const paid = await this.charge(
+      pending.value,
+      customer.email,
+      input.card,
+      deadline,
+    );
     if (!paid.ok) {
       await transactions.applyResult(pending.value.id, {
         status: 'ERROR',
@@ -152,30 +167,61 @@ export class CreateTransaction {
     transaction: Transaction,
     customerEmail: string,
     card: CardInput,
+    deadline: number,
   ): Promise<Result<Transaction, DomainError>> {
     const { gateway, transactions, poll, apply } = this.deps;
-    return andThenAsync(gateway.getAcceptanceTokens(), (acceptance) =>
-      andThenAsync(gateway.tokenizeCard(card), (token) =>
+    const timed = this.withinBudget(deadline);
+    return andThenAsync(
+      timed((o) => gateway.getAcceptanceTokens(o)),
+      (acceptance) =>
         andThenAsync(
-          gateway.createTransaction({
-            acceptance,
-            cardToken: token.id,
-            reference: transaction.reference,
-            amountInCents: transaction.amountInCents,
-            currency: CURRENCY,
-            customerEmail,
-          }),
-          async (created) => {
-            const marked = await transactions.markGatewayId(
-              transaction.id,
-              created.id,
-            );
-            return andThenAsync(poll.execute(created), (latest) =>
-              apply.execute(marked, latest),
-            );
-          },
+          timed((o) => gateway.tokenizeCard(card, o)),
+          (token) =>
+            andThenAsync(
+              timed((o) =>
+                gateway.createTransaction(
+                  {
+                    acceptance,
+                    cardToken: token.id,
+                    reference: transaction.reference,
+                    amountInCents: transaction.amountInCents,
+                    currency: CURRENCY,
+                    customerEmail,
+                  },
+                  o,
+                ),
+              ),
+              async (created) => {
+                // From here the charge exists: running out of time means PENDING, not error.
+                const marked = await transactions.markGatewayId(
+                  transaction.id,
+                  created.id,
+                );
+                return andThenAsync(poll.execute(created, deadline), (latest) =>
+                  apply.execute(marked, latest),
+                );
+              },
+            ),
         ),
-      ),
     );
+  }
+
+  /** Runs a gateway call with the time left, or fails if the budget is already spent. */
+  private withinBudget(deadline: number) {
+    return <T>(
+      call: (options: GatewayCallOptions) => Promise<Result<T, DomainError>>,
+    ): Promise<Result<T, DomainError>> => {
+      const timeoutMs = deadline - this.deps.clock.now().getTime();
+      return timeoutMs > 0
+        ? call({ timeoutMs })
+        : Promise.resolve(
+            err(
+              domainError(
+                'GATEWAY_ERROR',
+                'The payment gateway is too slow: no charge was made',
+              ),
+            ),
+          );
+    };
   }
 }

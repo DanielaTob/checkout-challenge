@@ -3,6 +3,7 @@ import type { CardInput } from '../../domain/payment/card';
 import type {
   AcceptanceTokens,
   CardToken,
+  GatewayCallOptions,
   GatewayPaymentRequest,
   GatewayTransaction,
   PaymentGateway,
@@ -69,11 +70,14 @@ export class HttpPaymentGateway implements PaymentGateway {
     private readonly fetchFn: FetchFn = fetch,
   ) {}
 
-  async getAcceptanceTokens(): Promise<Result<AcceptanceTokens, DomainError>> {
+  async getAcceptanceTokens(
+    options: GatewayCallOptions = {},
+  ): Promise<Result<AcceptanceTokens, DomainError>> {
     const res = await this.call(
       'merchant',
       'GET',
       `/merchants/${this.config.publicKey}`,
+      { timeoutMs: options.timeoutMs },
     );
     if (!res.ok) return res;
     const acceptanceToken = str(
@@ -92,8 +96,12 @@ export class HttpPaymentGateway implements PaymentGateway {
     return ok({ acceptanceToken, personalDataAuthToken });
   }
 
-  async tokenizeCard(card: CardInput): Promise<Result<CardToken, DomainError>> {
+  async tokenizeCard(
+    card: CardInput,
+    options: GatewayCallOptions = {},
+  ): Promise<Result<CardToken, DomainError>> {
     const res = await this.call('tokenize', 'POST', '/tokens/cards', {
+      timeoutMs: options.timeoutMs,
       auth: this.config.publicKey,
       body: {
         number: card.number.replace(/\s+/g, ''),
@@ -117,8 +125,10 @@ export class HttpPaymentGateway implements PaymentGateway {
 
   async createTransaction(
     req: GatewayPaymentRequest,
+    options: GatewayCallOptions = {},
   ): Promise<Result<GatewayTransaction, DomainError>> {
     const res = await this.call('create-transaction', 'POST', '/transactions', {
+      timeoutMs: options.timeoutMs,
       auth: this.config.privateKey,
       body: {
         acceptance_token: req.acceptance.acceptanceToken,
@@ -146,16 +156,22 @@ export class HttpPaymentGateway implements PaymentGateway {
 
   async getTransaction(
     id: string,
+    options: GatewayCallOptions = {},
   ): Promise<Result<GatewayTransaction, DomainError>> {
-    // Transient failures (5xx, timeout, network) are retried; a 4xx answer is not.
+    // Transient failures (5xx, timeout, network) are retried while time remains;
+    // a 4xx answer is not.
+    const deadline = Date.now() + (options.timeoutMs ?? Infinity);
+    const remaining = () => deadline - Date.now();
     const res = await retry(
       () =>
         this.call(
           'get-transaction',
           'GET',
           `/transactions/${encodeURIComponent(id)}`,
+          { timeoutMs: remaining() },
         ),
       STATUS_READ_RETRIES,
+      () => remaining() > 0,
     );
     if (!res.ok) return res;
     if (res.value.status !== 200)
@@ -183,8 +199,12 @@ export class HttpPaymentGateway implements PaymentGateway {
     operation: string,
     method: 'GET' | 'POST',
     urlPath: string,
-    options: { auth?: string; body?: unknown } = {},
+    options: { auth?: string; body?: unknown; timeoutMs?: number } = {},
   ): Promise<Result<RawResponse, DomainError>> {
+    const timeoutMs = Math.max(
+      1,
+      Math.min(this.config.timeoutMs, options.timeoutMs ?? Infinity),
+    );
     const headers: Record<string, string> = {
       accept: 'application/json',
     };
@@ -201,7 +221,7 @@ export class HttpPaymentGateway implements PaymentGateway {
             options.body === undefined
               ? undefined
               : JSON.stringify(options.body),
-          signal: AbortSignal.timeout(this.config.timeoutMs),
+          signal: AbortSignal.timeout(timeoutMs),
         },
       );
       const json: unknown = await res.json().catch(() => null);

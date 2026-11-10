@@ -115,5 +115,9 @@
     "esbuild@0.28.2": true,
     "@scarf/scarf": false,
     "@parcel/watcher": false
+  },
+  "overrides": {
+    "glob": "^14.0.4",
+    "minimatch": "^11.0.6"
   }
 }

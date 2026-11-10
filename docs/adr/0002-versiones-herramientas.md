@@ -18,3 +18,12 @@ La prueba exige Jest + ts-jest en front y back.
 
 ## Consecuencias
 - Si se migra a Nest 12 en el futuro, hay que pasar a ESM y a Vitest (fuera del alcance de la prueba).
+
+## Auditoría de dependencias (2026-11-10)
+
+`npm audit` reportaba avisos **moderados** heredados por toda la cadena de Jest (`@jest/expect`, `jest-runtime`, …) y por `@nestjs/cli`:
+`glob` (GHSA-3g3m-2fjr-6pw4) y `minimatch` (GHSA-g3hv-75wg-m249). Ninguno llega al runtime: 0 paquetes afectados en las dependencias de producción y en el bundle de la Lambda.
+
+- Se fuerzan las versiones corregidas con `overrides` en `backend/` y `frontend/`: `glob ^14.0.4`, `minimatch ^11.0.6` (verify completo en verde: lint, tests, cobertura, builds).
+- Queda un aviso **bajo** de `deepmerge` (GHSA-gcqx-w48m-w2h4) sin versión corregida publicada; solo lo usa la configuración de Jest en desarrollo. Se acepta y se revisa en cuanto haya parche.
+- La puerta de calidad sigue en `npm audit --audit-level=high`.

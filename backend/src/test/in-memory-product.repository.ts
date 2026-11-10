@@ -16,6 +16,16 @@ export class InMemoryProductRepository implements ProductRepository {
     this.calls.findById++;
     return Promise.resolve(this.products.find((p) => p.id === id) ?? null);
   }
+
+  stockOf(id: string): number | undefined {
+    return this.products.find((p) => p.id === id)?.stock;
+  }
+
+  /** Test-only: sets the stock of a product. */
+  setStock(id: string, stock: number): void {
+    const index = this.products.findIndex((p) => p.id === id);
+    this.products[index] = { ...this.products[index], stock };
+  }
 }
 
 export const aProduct = (overrides: Partial<Product> = {}): Product => ({

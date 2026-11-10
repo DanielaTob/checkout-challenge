@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { configureApp } from '../../configure-app';
 import { PRODUCT_REPOSITORY } from '../../domain/product/product.repository';
+import { FEES_PROVIDER } from '../../domain/quote/quote';
 import {
   aProduct,
   InMemoryProductRepository,
@@ -29,6 +30,13 @@ describe('ProductsController (HTTP)', () => {
     })
       .overrideProvider(PRODUCT_REPOSITORY)
       .useValue(repo)
+      .overrideProvider(FEES_PROVIDER)
+      .useValue({
+        getFees: () => ({
+          baseFeeInCents: 300000,
+          deliveryFeeInCents: 1000000,
+        }),
+      })
       .compile();
     app = moduleRef.createNestApplication();
     configureApp(app, undefined);
@@ -77,6 +85,46 @@ describe('ProductsController (HTTP)', () => {
     expect(repo.calls.findById).toBe(0);
   });
 
+  it('AC-003-01 GET /products/:id/quote answers 200 with the breakdown computed in the backend', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/${headphones.id}/quote?quantity=2`)
+      .expect(200);
+    expect(res.body).toEqual({
+      productId: headphones.id,
+      quantity: 2,
+      unitPriceInCents: headphones.priceInCents,
+      subtotalInCents: headphones.priceInCents * 2,
+      baseFeeInCents: 300000,
+      deliveryFeeInCents: 1000000,
+      totalInCents: headphones.priceInCents * 2 + 1300000,
+      currency: 'COP',
+    });
+  });
+
+  it('AC-003-02 GET /products/:id/quote answers 409 when quantity exceeds stock', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/${watch.id}/quote?quantity=1`)
+      .expect(409);
+  });
+
+  it.each(['0', '11', '1.5', 'abc', ''])(
+    'AC-003-03 GET /products/:id/quote answers 400 for quantity=%p',
+    async (quantity) => {
+      await request(app.getHttpServer())
+        .get(`/products/${headphones.id}/quote?quantity=${quantity}`)
+        .expect(400);
+    },
+  );
+
+  it('AC-003-03 GET /products/:id/quote answers 400 for a non-UUID id and 404 for an unknown product', async () => {
+    await request(app.getHttpServer())
+      .get('/products/nope/quote?quantity=1')
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/products/00000000-0000-4000-8000-000000000000/quote?quantity=1')
+      .expect(404);
+  });
+
   it('documents both routes in Swagger', async () => {
     const res = await request(app.getHttpServer())
       .get('/docs-json')
@@ -85,7 +133,11 @@ describe('ProductsController (HTTP)', () => {
       (res.body as { paths: Record<string, unknown> }).paths,
     );
     expect(paths).toEqual(
-      expect.arrayContaining(['/products', '/products/{id}']),
+      expect.arrayContaining([
+        '/products',
+        '/products/{id}',
+        '/products/{id}/quote',
+      ]),
     );
   });
 });

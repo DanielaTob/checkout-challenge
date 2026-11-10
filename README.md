@@ -56,7 +56,7 @@ flowchart LR
   subgraph DOM["domain/ · sin frameworks"]
     ENT["entidades y reglas puras<br/>validateCard (Luhn, vencimiento, marca)<br/>buildQuote · integritySignature"]
     PORTS["puertos<br/>ProductRepository · CustomerRepository<br/>TransactionRepository · DeliveryRepository<br/>PaymentGateway · FeesProvider · Clock"]
-    RES["Result&lt;T, DomainError&gt;"]
+    RES["Result #lt;T, DomainError#gt;"]
   end
 
   client --> HTTP --> UC
@@ -211,7 +211,7 @@ erDiagram
     text description
     text image_url
     int price_in_cents
-    int stock "nunca < 0"
+    int stock "nunca negativo"
     timestamp created_at
     timestamp updated_at
   }

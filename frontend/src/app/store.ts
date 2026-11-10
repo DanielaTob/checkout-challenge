@@ -10,9 +10,10 @@ import {
   REHYDRATE,
 } from 'redux-persist';
 import { checkoutReducer } from '../features/checkout/checkoutSlice';
+import { productsReducer } from '../features/product/productsSlice';
 import { createLocalStorage } from './storage';
 
-export const rootReducer = combineReducers({ checkout: checkoutReducer });
+export const rootReducer = combineReducers({ checkout: checkoutReducer, products: productsReducer });
 
 // Only whitelisted slices are persisted. Card number and CVC must never reach any slice
 // that is persisted (see spec 005); they live only in component state.

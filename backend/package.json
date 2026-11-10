@@ -84,7 +84,8 @@
       "!main.ts",
       "!lambda.ts",
       "!generated/**",
-      "!**/*.module.ts"
+      "!**/*.module.ts",
+      "!test/**"
     ],
     "coverageDirectory": "../coverage",
     "coverageReporters": [

@@ -9,3 +9,10 @@ describe('store', () => {
     persistor.pause();
   });
 });
+
+describe('persistence', () => {
+  it('AC-001-07 never persists products (stock is always fetched fresh)', async () => {
+    const { persistConfig } = await import('./store');
+    expect(persistConfig.whitelist).not.toContain('products');
+  });
+});

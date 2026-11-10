@@ -1,6 +1,7 @@
 import { ApplyTransactionResult } from '../application/transactions/apply-transaction-result.use-case';
 import { CreateTransaction } from '../application/transactions/create-transaction.use-case';
 import { PollTransactionStatus } from '../application/transactions/poll-transaction-status.use-case';
+import { RefreshTransaction } from '../application/transactions/refresh-transaction.use-case';
 import type { CreateTransactionInput } from '../application/transactions/create-transaction.use-case';
 import { FakeClock, FakePaymentGateway } from './fake-payment-gateway';
 import {
@@ -51,6 +52,7 @@ export const checkoutFixture = (stock = 5) => {
   const fees = { getFees: () => FEES };
   const poll = new PollTransactionStatus(gateway, clock);
   const apply = new ApplyTransactionResult(transactions);
+  const refresh = new RefreshTransaction(gateway, apply);
   let seq = 0;
   const createTransaction = new CreateTransaction({
     products,
@@ -61,6 +63,7 @@ export const checkoutFixture = (stock = 5) => {
     clock,
     poll,
     apply,
+    refresh,
     newReference: () => `TX-${++seq}`,
   });
   return {
@@ -74,6 +77,7 @@ export const checkoutFixture = (stock = 5) => {
     fees,
     poll,
     apply,
+    refresh,
     createTransaction,
   };
 };

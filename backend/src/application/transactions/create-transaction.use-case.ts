@@ -19,6 +19,7 @@ import type { Transaction } from '../../domain/transaction/transaction';
 import type { TransactionRepository } from '../../domain/transaction/transaction.repository';
 import type { ApplyTransactionResult } from './apply-transaction-result.use-case';
 import type { PollTransactionStatus } from './poll-transaction-status.use-case';
+import type { RefreshTransaction } from './refresh-transaction.use-case';
 
 export interface CreateTransactionInput {
   readonly idempotencyKey: string | null;
@@ -45,6 +46,7 @@ export interface CreateTransactionDeps {
   readonly clock: Clock;
   readonly poll: PollTransactionStatus;
   readonly apply: ApplyTransactionResult;
+  readonly refresh: RefreshTransaction;
   readonly newReference?: () => string;
 }
 
@@ -61,6 +63,13 @@ export class CreateTransaction {
     input: CreateTransactionInput,
   ): Promise<Result<CreatedTransaction, DomainError>> {
     const { products, customers, transactions, fees, clock } = this.deps;
+
+    if (input.idempotencyKey) {
+      const existing = await transactions.findByIdempotencyKey(
+        input.idempotencyKey,
+      );
+      if (existing) return this.replay(existing, input);
+    }
 
     const card = validateCard(input.card, clock.now());
     if (!card.ok) return card;
@@ -94,7 +103,14 @@ export class CreateTransaction {
       idempotencyKey: input.idempotencyKey,
       shipping: input.shipping,
     });
-    if (!pending.ok) return pending;
+    if (!pending.ok) {
+      // Two requests with the same key raced: the other one inserted first.
+      const raced =
+        pending.error.code === 'CONFLICT' && input.idempotencyKey
+          ? await transactions.findByIdempotencyKey(input.idempotencyKey)
+          : null;
+      return raced ? this.replay(raced, input) : pending;
+    }
 
     const paid = await this.charge(pending.value, customer.email, input.card);
     if (!paid.ok) {
@@ -106,6 +122,30 @@ export class CreateTransaction {
       return paid;
     }
     return ok({ transaction: paid.value, created: true });
+  }
+
+  /** Same Idempotency-Key: never charge again; return the (refreshed) transaction. */
+  private async replay(
+    existing: Transaction,
+    input: CreateTransactionInput,
+  ): Promise<Result<CreatedTransaction, DomainError>> {
+    if (
+      existing.productId !== input.productId ||
+      existing.customerId !== input.customerId ||
+      existing.quantity !== input.quantity
+    ) {
+      return err(
+        domainError(
+          'CONFLICT',
+          'Idempotency-Key already used with a different request',
+        ),
+      );
+    }
+    const refreshed = await this.deps.refresh.execute(existing);
+    return ok({
+      transaction: refreshed.ok ? refreshed.value : existing,
+      created: false,
+    });
   }
 
   private charge(

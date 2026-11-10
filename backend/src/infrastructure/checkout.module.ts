@@ -85,6 +85,7 @@ import { ProductsModule } from './products.module';
         clock: Clock,
         poll: PollTransactionStatus,
         apply: ApplyTransactionResult,
+        refresh: RefreshTransaction,
       ) =>
         new CreateTransaction({
           products,
@@ -95,6 +96,7 @@ import { ProductsModule } from './products.module';
           clock,
           poll,
           apply,
+          refresh,
         }),
       inject: [
         PRODUCT_REPOSITORY,
@@ -105,6 +107,7 @@ import { ProductsModule } from './products.module';
         CLOCK,
         PollTransactionStatus,
         ApplyTransactionResult,
+        RefreshTransaction,
       ],
     },
     {

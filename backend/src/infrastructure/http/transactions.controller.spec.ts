@@ -163,6 +163,22 @@ describe('TransactionsController (HTTP)', () => {
       .expect(502);
   });
 
+  it('AC-005-09 POST /transactions with a known Idempotency-Key answers 200 with the same transaction', async () => {
+    const key = '00000000-0000-4000-8000-0000000000c1';
+    const first = await post(body()).set('Idempotency-Key', key).expect(201);
+    const again = await post(body()).set('Idempotency-Key', key).expect(200);
+    expect(again.body).toEqual(first.body);
+    expect(ctx.gateway.createTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('AC-005-10 POST /transactions with a known Idempotency-Key and another body answers 409', async () => {
+    const key = '00000000-0000-4000-8000-0000000000c2';
+    await post(body()).set('Idempotency-Key', key).expect(201);
+    await post(body({ quantity: 1 }))
+      .set('Idempotency-Key', key)
+      .expect(409);
+  });
+
   it('documents the transaction routes in Swagger', async () => {
     const res = await request(app.getHttpServer())
       .get('/docs-json')

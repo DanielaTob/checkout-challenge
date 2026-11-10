@@ -1,0 +1,70 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: rgb(15 20 35 / 0.55);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  height: 100dvh;
+  background: var(--color-bg);
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px var(--space);
+  background: var(--color-surface);
+  border-bottom: 1px solid #e3e6ee;
+}
+
+.modal__title {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.modal__close {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.modal__close:focus-visible {
+  outline: 3px solid var(--color-primary);
+}
+
+/* Scrolls internally so the footer button stays reachable with the keyboard open (375×667). */
+.modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space);
+  overscroll-behavior: contain;
+}
+
+.modal__footer {
+  padding: 12px var(--space) calc(12px + env(safe-area-inset-bottom));
+  background: var(--color-surface);
+  border-top: 1px solid #e3e6ee;
+}
+
+@media (min-width: 600px) {
+  .modal-overlay { align-items: center; }
+  .modal {
+    height: auto;
+    max-height: 90dvh;
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+}

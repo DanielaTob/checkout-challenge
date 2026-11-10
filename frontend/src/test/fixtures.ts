@@ -44,3 +44,14 @@ export const summaryCheckout = (overrides: Partial<CheckoutState> = {}): Checkou
 });
 
 export const plain = (s: string | null | undefined) => (s ?? '').replace(/ /g, ' ');
+
+export const aTransaction = (overrides: Partial<import('../features/payment/types').Transaction> = {}) => ({
+  id: '7a1d2c3a-0000-4000-8000-0000000000aa',
+  reference: 'TX-7a1d2c3a',
+  status: 'APPROVED' as const,
+  totalInCents: 26090000,
+  cardBrand: 'VISA',
+  cardLast4: '4242',
+  failureReason: null,
+  ...overrides,
+});

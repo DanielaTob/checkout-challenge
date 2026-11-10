@@ -52,7 +52,11 @@ const checkoutSlice = createSlice({
     goToStep(state, action: PayloadAction<CheckoutStep>) {
       state.step = action.payload;
     },
-    resetCheckout: () => initialCheckoutState,
+    /** Back to the shop: clears the flow; optionally keeps the delivery data for the next purchase. */
+    resetCheckout: (_state, action: PayloadAction<{ keepDelivery?: DeliveryForm } | undefined>) => ({
+      ...initialCheckoutState,
+      delivery: action.payload?.keepDelivery ?? initialCheckoutState.delivery,
+    }),
   },
 });
 

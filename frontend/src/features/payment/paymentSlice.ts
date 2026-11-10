@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from '../../app/store';
-import { ApiError, postJson } from '../../shared/api/http';
+import { ApiError, getJson, postJson } from '../../shared/api/http';
 import { onlyDigits } from '../../shared/utils/card';
 import { parseExpiry } from '../../shared/utils/cardFields';
 import { uuid } from '../../shared/utils/uuid';
@@ -77,6 +77,11 @@ export const payTransaction = createAsyncThunk<Transaction, void, { state: RootS
   { condition: (_, { getState }) => getState().payment.status !== 'paying' },
 );
 
+/** Refreshes a transaction; the backend re-queries the gateway while it is PENDING. */
+export const pollTransaction = createAsyncThunk<Transaction, string>('payment/poll', (id, { signal }) =>
+  getJson<Transaction>(`/transactions/${id}`, signal),
+);
+
 const paymentSlice = createSlice({
   name: 'payment',
   initialState: initialPaymentState,
@@ -96,6 +101,10 @@ const paymentSlice = createSlice({
         state.status = 'succeeded';
         state.transaction = action.payload;
       })
+      .addCase(pollTransaction.fulfilled, (state, action) => {
+        state.transaction = action.payload;
+      })
+      // pollTransaction.rejected: keep the last known transaction; the screen polls again.
       .addCase(payTransaction.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload ?? 'No pudimos procesar el pago. Intenta de nuevo.';

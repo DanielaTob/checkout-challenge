@@ -246,6 +246,39 @@ erDiagram
 - `subtotal = amount_in_cents − base_fee_in_cents − delivery_fee_in_cents`; los tres montos se calculan en el backend y quedan congelados en la transacción.
 - `deliveries.transaction_id` es único: como mucho una entrega por pago, aunque el resultado se aplique dos veces.
 
+## API
+
+- **Swagger**: `/docs` (local: <http://localhost:3000/docs>; desplegada: <https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com/docs>).
+- **Postman**: colección en [`docs/postman.json`](docs/postman.json) (importar en Postman; variable `baseUrl`, por defecto `http://localhost:3000`, o `https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com` para la API desplegada). Las carpetas se ejecutan en orden y se pasan solas `customerId`, `transactionId`, `idempotencyKey` y `deliveryId`; cubre los caminos felices y los códigos 400, 404, 409, 422 y la repetición idempotente.
+- Errores con forma única: `{ "statusCode": 409, "error": "Conflict", "message": "Only 5 unit(s) of product … left" }`.
+- Montos en centavos de COP. Ejemplos con las tarifas por defecto (`BASE_FEE_IN_CENTS=300000`, `DELIVERY_FEE_IN_CENTS=800000`).
+
+| Método | Ruta | Códigos | Ejemplo |
+|---|---|---|---|
+| GET | `/products` | 200 | → `[{ "id": "6f1d…0001", "name": "Audífonos inalámbricos", "priceInCents": 24990000, "stock": 10, … }]` |
+| GET | `/products/:id` | 200, 400 (id no UUID), 404 | `/products/6f1d2c3a-0000-4000-8000-000000000001` → el producto con su stock |
+| GET | `/products/:id/quote?quantity=n` | 200, 400 (n ∉ 1..10 o id no UUID), 404, 409 (sin stock) | `?quantity=2` → `{ "subtotalInCents": 49980000, "baseFeeInCents": 300000, "deliveryFeeInCents": 800000, "totalInCents": 51080000, "currency": "COP", … }` |
+| POST | `/customers` | 201 (nuevo), 200 (email ya existía: mismo id, datos actualizados), 400 | `{ "fullName": "Ana Pérez", "email": "ana@example.com", "phone": "+573001234567" }` → `{ "id": "…", … }` |
+| POST | `/transactions` | 201, 200 (misma `Idempotency-Key`), 400, 404, 409 (sin stock o clave reutilizada con otro cuerpo), 422 (tarjeta: Luhn, vencida o marca), 502 (pasarela) | Header `Idempotency-Key: <uuid>`; cuerpo `{ "productId", "customerId", "quantity": 1, "shipping": { "address", "city", "region", "postalCode" }, "card": { "number": "4242424242424242", "cvc": "123", "expMonth": "12", "expYear": "29", "holderName": "Ana Perez" } }` → `{ "id", "reference": "TX-…", "status": "APPROVED", "totalInCents": 26090000, "cardBrand": "VISA", "cardLast4": "4242", "delivery": { "status": "PENDING", … } }` |
+| GET | `/transactions/:id` | 200, 400, 404, 502 | Si sigue PENDING consulta la pasarela y aplica el resultado → `{ "status": "DECLINED", "failureReason": "La transacción fue rechazada (Sandbox)", "delivery": null, … }` |
+| GET | `/transactions/by-key/:idempotencyKey` | 200, 400, 404, 502 | Recupera un pago cuya respuesta se perdió (recarga en pleno pago) → misma forma que `GET /transactions/:id` |
+| GET | `/deliveries/:id` | 200, 400, 404 | → `{ "id", "transactionId", "customerId", "address": "Calle 1 # 2-3", "city": "Bogotá", "region": "Cundinamarca", "postalCode": "110111", "status": "PENDING" }` |
+| GET | `/health` | 200 | → `{ "status": "ok" }` |
+
+### Límites de tiempo
+
+API Gateway corta a los ~30 s, así que la API se acota mucho antes:
+
+| Dónde | Límite | Si se agota | AC |
+|---|---|---|---|
+| Cada llamada a la pasarela | 8 s (o lo que quede del presupuesto, si es menos) | `GATEWAY_ERROR` | AC-005-11 |
+| `POST /transactions` completo | ~15 s desde que llega la petición | cobro ya creado → `201` con `status: "PENDING"` y el front sigue con `GET /transactions/:id`; antes de cobrar → `502`, la transacción queda en ERROR y no se cobra nada | AC-005-14 |
+| Polling del estado dentro del `POST` | cada 1 s, hasta 10 veces, sin pasar del presupuesto | responde PENDING | AC-004-08 |
+| Consulta de estado en `GET /transactions/:id` y `by-key` | ~10 s en total con reintentos | `502` y la transacción sigue PENDING para la siguiente consulta | AC-005-15 |
+| Reintentos | solo las lecturas de estado (GET), hasta 2, y solo si queda tiempo útil; tokenizar y cobrar **nunca** se reintentan | — | AC-005-12 |
+
+El front consulta cada 2 s hasta un estado final, como mucho 2 min (AC-004-18).
+
 ## Estructura
 
 ```

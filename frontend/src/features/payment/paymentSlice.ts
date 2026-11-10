@@ -5,7 +5,7 @@ import { onlyDigits } from '../../shared/utils/card';
 import { parseExpiry } from '../../shared/utils/cardFields';
 import { uuid } from '../../shared/utils/uuid';
 import { clearCardSession } from '../checkout/cardSessionSlice';
-import { goToStep } from '../checkout/checkoutSlice';
+import { goToStep, requireCardAgain } from '../checkout/checkoutSlice';
 import type { Transaction } from './types';
 
 export interface PaymentState {
@@ -27,7 +27,11 @@ export const paymentErrorMessage = (e: unknown): string => {
   return 'No pudimos procesar el pago. Intenta de nuevo.';
 };
 
-export const payTransaction = createAsyncThunk<Transaction, void, { state: RootState; rejectValue: string }>(
+export const payTransaction = createAsyncThunk<
+  Transaction,
+  void,
+  { state: RootState; rejectValue: string; pendingMeta: { idempotencyKey: string } }
+>(
   'payment/pay',
   async (_, { getState, dispatch, rejectWithValue }) => {
     const { checkout, cardSession, payment } = getState();
@@ -35,8 +39,7 @@ export const payTransaction = createAsyncThunk<Transaction, void, { state: RootS
     if (!cardSession || !expiry || !checkout.productId) {
       return rejectWithValue('Por seguridad, vuelve a ingresar los datos de tu tarjeta');
     }
-    const key = payment.idempotencyKey ?? uuid();
-    dispatch(paymentSlice.actions.keyAssigned(key));
+    const key = payment.idempotencyKey as string; // set by the pending action (see getPendingMeta)
     const { delivery } = checkout;
     try {
       const customer = await postJson<{ id: string }>('/customers', {
@@ -73,8 +76,28 @@ export const payTransaction = createAsyncThunk<Transaction, void, { state: RootS
       return rejectWithValue(paymentErrorMessage(e));
     }
   },
-  // Double-tap guard: a payment already in flight is never sent twice.
-  { condition: (_, { getState }) => getState().payment.status !== 'paying' },
+  {
+    // Double-tap guard: a payment already in flight is never sent twice.
+    condition: (_, { getState }) => getState().payment.status !== 'paying',
+    // The key travels in the synchronous `pending` action, so it is persisted *before* any request:
+    // if the page reloads mid-payment, the app can look the payment up by this key (no double charge).
+    getPendingMeta: (_, { getState }) => ({ idempotencyKey: getState().payment.idempotencyKey ?? uuid() }),
+  },
+);
+
+/** After a reload during a payment: find it by its key instead of paying again. */
+export const recoverPayment = createAsyncThunk<Transaction, string, { rejectValue: 'NOT_FOUND' | 'UNKNOWN' }>(
+  'payment/recover',
+  async (key, { dispatch, signal, rejectWithValue }) => {
+    try {
+      const transaction = await getJson<Transaction>(`/transactions/by-key/${key}`, signal);
+      dispatch(goToStep('result'));
+      return transaction;
+    } catch (e) {
+      dispatch(requireCardAgain());
+      return rejectWithValue(e instanceof ApiError && e.status === 404 ? 'NOT_FOUND' : 'UNKNOWN');
+    }
+  },
 );
 
 /** Refreshes a transaction; the backend re-queries the gateway while it is PENDING. */
@@ -86,20 +109,26 @@ const paymentSlice = createSlice({
   name: 'payment',
   initialState: initialPaymentState,
   reducers: {
-    keyAssigned(state, action: { payload: string }) {
-      state.idempotencyKey = action.payload;
-    },
     resetPayment: () => initialPaymentState,
   },
   extraReducers: (builder) => {
     builder
-      .addCase(payTransaction.pending, (state) => {
+      .addCase(payTransaction.pending, (state, action) => {
+        state.idempotencyKey = action.meta.idempotencyKey;
         state.status = 'paying';
         state.error = null;
       })
       .addCase(payTransaction.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.transaction = action.payload;
+      })
+      .addCase(recoverPayment.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.transaction = action.payload;
+      })
+      // Not found or unknown: keep the same key (a retry stays idempotent) and unblock the button.
+      .addCase(recoverPayment.rejected, (state) => {
+        state.status = 'idle';
       })
       .addCase(pollTransaction.fulfilled, (state, action) => {
         state.transaction = action.payload;

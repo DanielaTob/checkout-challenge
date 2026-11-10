@@ -15,6 +15,7 @@ export function CheckoutDetails() {
   const dispatch = useAppDispatch();
   const savedDelivery = useAppSelector((s) => s.checkout.delivery);
   const cardSession = useAppSelector((s) => s.cardSession);
+  const notice = useAppSelector((s) => s.checkout.notice);
 
   // Coming back from the summary ("Editar datos") the card is still in memory: prefill it.
   const [card, setCard] = useState<CardForm>(() =>
@@ -57,6 +58,11 @@ export function CheckoutDetails() {
           onContinue();
         }}
       >
+        {notice && (
+          <p className="notice notice--info" role="status">
+            {notice}
+          </p>
+        )}
         <CardFields
           value={card}
           errors={cardErrors}

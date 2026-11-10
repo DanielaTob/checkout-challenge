@@ -3,11 +3,17 @@ import { startCheckout } from '../features/checkout/checkoutSlice';
 import { ResultScreen } from '../features/payment/ResultScreen';
 import { SummarySheet } from '../features/payment/SummarySheet';
 import { ProductList } from '../features/product/ProductList';
+import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from './hooks';
+import { resumeAfterReload } from './resumeAfterReload';
 
 export function App() {
   const dispatch = useAppDispatch();
   const step = useAppSelector((s) => s.checkout.step);
+
+  useEffect(() => {
+    void dispatch(resumeAfterReload());
+  }, [dispatch]);
   return (
     <main className="app" data-step={step}>
       <h1 className="app__title">Checkout</h1>

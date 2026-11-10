@@ -8,7 +8,8 @@ const card = { number: '4242424242424242', expiry: '08/29', cvc: '123', holderNa
 
 describe('card data split (sensitive vs persisted)', () => {
   it('AC-002-09 the cardSession slice is never persisted', () => {
-    expect(persistConfig.whitelist).toEqual(['checkout']);
+    // Persisted slices hold no card data: checkout keeps brand+last4, payment keeps key + result.
+    expect(persistConfig.whitelist).toEqual(['checkout', 'payment']);
     expect(persistConfig.whitelist).not.toContain('cardSession');
   });
 

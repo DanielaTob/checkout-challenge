@@ -62,37 +62,23 @@ docs/              contexto.md · adr/
 
 ## Flujos de trabajo
 
-### `spec <nombre>`
-Crea `specs/NNN-nombre/spec.md` con:
-- objetivo,
-- alcance y fuera de alcance,
-- criterios de aceptación con IDs `AC-NNN-01…` en formato Dado / Cuando / Entonces,
-- casos borde.
+El detalle de cada flujo está en su skill de proyecto (`.claude/skills/`):
 
-Luego `plan.md` (diseño, puertos, endpoints, modelo) y `tasks.md` (tareas de ≤ 1 h, cada una con los AC que cubre).
-
-### `ship <NNN>`
-1. Lee `spec.md`, `plan.md` y `tasks.md` de la spec.
-2. `git checkout -b feat/NNN-nombre`.
-3. Por cada tarea:
-   - escribe el test primero, con el ID del AC en el nombre;
-   - implementa;
-   - corre `scripts/verify.sh`;
-   - haz el commit y marca la tarea en `tasks.md`.
-4. `npx tsx scripts/trace.ts` debe pasar.
-5. Abre el PR con la plantilla: enlace a la spec, AC cubiertos y salida de verify.
-
-### `verify`
-Ejecuta `scripts/verify.sh`. Si algo falla, corrige y repite antes de seguir. No desactives ni saltes ninguna verificación.
+- **`spec <nombre>`** → [`.claude/skills/spec/SKILL.md`](.claude/skills/spec/SKILL.md): spec.md con AC, plan.md y tasks.md, antes de escribir código.
+- **`ship <NNN>`** → [`.claude/skills/ship/SKILL.md`](.claude/skills/ship/SKILL.md): rama `feat/NNN-nombre` desde `develop`, TDD con un commit por tarea y PR de vuelta a `develop`.
+- **`verify`** → [`.claude/skills/verify/SKILL.md`](.claude/skills/verify/SKILL.md): ejecuta `scripts/verify.sh` y corrige hasta que pase.
 
 ## Comandos
 
 ```bash
-scripts/verify.sh                  # puerta de calidad completa
-npx tsx scripts/trace.ts           # matriz criterios → tests
+scripts/verify.sh                  # puerta de calidad completa (requiere FORBIDDEN_WORD exportada)
+VERIFY_FAST=1 scripts/verify.sh    # lo que corre el pre-commit (sin builds ni npm audit)
+npx tsx scripts/trace.ts           # matriz criterios → tests (todas las specs)
+npx tsx scripts/trace.ts --spec 004
+npx tsx scripts/trace.ts --shipped # solo specs con tasks.md completo (lo usa la CI)
 cd backend && npm run test:cov
 cd frontend && npm run test:cov
-cd backend && npx prisma migrate dev && npx prisma db seed
+cd backend && npm run db:migrate && npm run db:seed
 ```
 
 ## Lo que un agente NO debe hacer

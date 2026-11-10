@@ -83,3 +83,14 @@ describe('ProductList', () => {
     expect(getJson).not.toHaveBeenCalled();
   });
 });
+
+describe('ProductList refresh', () => {
+  beforeEach(() => getJson.mockReset());
+
+  it('keeps showing the cards (not the skeleton) while products are refetched', () => {
+    getJson.mockReturnValue(new Promise(() => {}));
+    renderWithStore(<ProductList />, { products: { items: [headphones], status: 'loading', error: null } });
+    expect(screen.getByRole('article', { name: 'Audífonos inalámbricos' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Cargando productos' })).not.toBeInTheDocument();
+  });
+});

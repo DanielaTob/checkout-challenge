@@ -129,3 +129,17 @@
     display: flex;
   }
 }
+
+/* Screen 5: the stock just changed (e.g. after a purchase). */
+.product-card--updated {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px rgb(181 230 29 / 0.35), var(--shadow);
+}
+.product-card--updated .badge {
+  animation: badge-pop 600ms var(--ease) 2;
+}
+@keyframes badge-pop {
+  50% {
+    transform: scale(1.12);
+  }
+}

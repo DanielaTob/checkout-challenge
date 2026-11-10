@@ -1,12 +1,115 @@
 # Checkout challenge
 
-Checkout móvil de un producto pagado con tarjeta de crédito a través de una pasarela de pago en modo **sandbox** (sin dinero real).
+Checkout móvil de un producto pagado con tarjeta de crédito a través de una pasarela de pago en modo **sandbox** (sin dinero real): producto → tarjeta y entrega → resumen → resultado → vuelta al producto con el stock actualizado. Si el usuario recarga, la app retoma el paso en el que iba.
 
-- **Frontend**: React + TypeScript (Vite), Redux Toolkit + redux-persist, mobile-first.
-- **Backend**: NestJS + TypeScript, arquitectura hexagonal y Railway Oriented Programming, PostgreSQL (Neon) con Prisma.
-- **Nube**: front en S3 + CloudFront; back en AWS Lambda + API Gateway.
+| | URL |
+|---|---|
+| **App (front)** | <https://d3uvn5ovkcpvxw.cloudfront.net> |
+| **API** | <https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com> |
+| **Swagger** | <https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com/docs> |
+| **Health** | <https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com/health> |
+| **Postman** | [`docs/postman.json`](docs/postman.json) |
 
-> 🚧 README en construcción: arquitectura, modelo de datos, Swagger, cobertura, trazabilidad y URLs se completan en la entrega final.
+- **Frontend**: React + TypeScript (Vite), Redux Toolkit + redux-persist, CSS mobile-first (desde iPhone SE 375×667).
+- **Backend**: NestJS + TypeScript, arquitectura hexagonal (puertos y adaptadores) y Railway Oriented Programming.
+- **Base de datos**: PostgreSQL serverless (Neon) con Prisma, conexión SSL.
+- **Nube (AWS)**: front en S3 privado + CloudFront (OAC, HTTPS); back en Lambda (fuera de la VPC) + API Gateway HTTP API. Infraestructura en CloudFormation ([`infra/template.yaml`](infra/template.yaml)).
+- **Seguridad**: HTTPS en ambos extremos; CloudFront agrega HSTS (`max-age=63072000; preload`), CSP `default-src 'self'`, `X-Frame-Options: DENY` y `nosniff`; la API usa `helmet`, CORS restringido al dominio del front y validación estricta de DTOs (`whitelist` + `forbidNonWhitelisted`). La tarjeta se tokeniza en la pasarela: el número y el CVC nunca se guardan, ni se loguean, ni llegan a `localStorage` (hay tests que lo prueban).
+
+**Tarjetas del sandbox**: `4242 4242 4242 4242` → aprobada · `4111 1111 1111 1111` → rechazada (cualquier CVC de 3 dígitos y fecha futura).
+
+## Arquitectura
+
+### Backend: hexagonal (puertos y adaptadores)
+
+Las dependencias apuntan hacia dentro: la infraestructura conoce a la aplicación y al dominio, nunca al revés. El **dominio no importa NestJS ni Prisma**, y los controladores no tienen lógica de negocio: validan el DTO, llaman a un caso de uso y traducen su `Result` a HTTP.
+
+```mermaid
+flowchart LR
+  client(["Front / Postman"])
+
+  subgraph INF["infrastructure/ · adaptadores"]
+    direction TB
+    HTTP["http/<br/>controladores + DTOs (class-validator)<br/>result-to-http"]
+    PRISMA["prisma/<br/>repositorios Prisma"]
+    GW["gateway/<br/>HttpPaymentGateway (timeouts, reintentos)"]
+    CFG["config/<br/>env validado, ConfigFeesProvider"]
+    MOD["*.module.ts<br/>cableado Nest (useFactory)"]
+  end
+
+  subgraph APP["application/ · casos de uso"]
+    UC["CreateTransaction · PollTransactionStatus<br/>ApplyTransactionResult · RefreshTransaction<br/>GetTransaction(ByKey) · QuoteCheckout<br/>CreateCustomer · GetDelivery · List/GetProduct"]
+  end
+
+  subgraph DOM["domain/ · sin frameworks"]
+    ENT["entidades y reglas puras<br/>validateCard (Luhn, vencimiento, marca)<br/>buildQuote · integritySignature"]
+    PORTS["puertos<br/>ProductRepository · CustomerRepository<br/>TransactionRepository · DeliveryRepository<br/>PaymentGateway · FeesProvider · Clock"]
+    RES["Result&lt;T, DomainError&gt;"]
+  end
+
+  client --> HTTP --> UC
+  UC --> ENT
+  UC --> PORTS
+  UC --> RES
+  MOD -. construye .-> UC
+  PRISMA -. implementa .-> PORTS
+  GW -. implementa .-> PORTS
+  CFG -. implementa .-> PORTS
+  PRISMA --> DB[("PostgreSQL · Neon")]
+  GW --> PAY[["Pasarela de pago · sandbox"]]
+```
+
+- Los casos de uso son clases TypeScript planas; los módulos de Nest los construyen con `useFactory` e inyectan los adaptadores por *token* (`PAYMENT_GATEWAY`, `TRANSACTION_REPOSITORY`…).
+- En los tests se cambian los adaptadores por dobles en memoria (`backend/src/test/`): los casos de uso se prueban sin BD ni red, y los controladores con el stack HTTP real (pipes, filtros) sobre esos dobles.
+- El tiempo es un puerto (`Clock`), así que el polling y los presupuestos de tiempo se prueban con tiempo virtual.
+
+### Railway Oriented Programming
+
+Cada caso de uso devuelve `Result<T, DomainError>` y **nunca lanza excepciones por errores de negocio**. Los pasos se encadenan con `andThen` / `andThenAsync`: el primer fallo desvía el resto del flujo al carril de error sin `try/catch`.
+
+```ts
+// domain/shared/result.ts
+type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
+
+// application/transactions/create-transaction.use-case.ts (simplificado)
+return andThenAsync(timed((o) => gateway.getAcceptanceTokens(o)), (acceptance) =>
+  andThenAsync(timed((o) => gateway.tokenizeCard(card, o)), (token) =>
+    andThenAsync(timed((o) => gateway.createTransaction({ acceptance, cardToken: token.id, … }, o)),
+      async (created) => {
+        const marked = await transactions.markGatewayId(transaction.id, created.id);
+        return andThenAsync(poll.execute(created, deadline), (latest) => apply.execute(marked, latest));
+      })));
+```
+
+```mermaid
+flowchart LR
+  A["validar tarjeta"] -->|ok| B["producto y cliente"] -->|ok| C["cotizar"] -->|ok| D["PENDING con stock bloqueado"] -->|ok| E["pasarela: tokens → tokenizar → cobrar"] -->|ok| F["polling y aplicar resultado"] --> OK(["201 / 200"])
+  A -->|VALIDATION| X(["carril de error"])
+  B -->|NOT_FOUND| X
+  C -->|OUT_OF_STOCK| X
+  D -->|OUT_OF_STOCK · CONFLICT| X
+  E -->|GATEWAY_ERROR| X
+  X --> H["result-to-http"]
+```
+
+El controlador desenvuelve el `Result` con `unwrapOrThrow` (`infrastructure/http/result-to-http.ts`), el único sitio donde un error de dominio se convierte en código HTTP:
+
+| `DomainError.code` | HTTP | Ejemplo |
+|---|---|---|
+| — (DTO inválido, antes del caso de uso) | 400 | `quantity: 0`, id que no es UUID, campo desconocido |
+| `VALIDATION` | 422 | tarjeta que no pasa Luhn, vencida o de marca no soportada |
+| `NOT_FOUND` | 404 | producto, cliente, transacción o entrega inexistente |
+| `OUT_OF_STOCK` | 409 | cantidad mayor que el stock |
+| `CONFLICT` | 409 | `Idempotency-Key` reutilizada con otro cuerpo |
+| `GATEWAY_ERROR` | 502 | la pasarela falló, respondió algo inválido o se agotó el tiempo |
+
+Las excepciones se reservan para lo que no es negocio (BD caída, invariantes rotas), y Nest las responde como 500.
+
+### Frontend
+
+- Features en `frontend/src/features/` (`product`, `checkout`, `payment`), cada una con su slice de Redux, componentes y tests; utilidades puras en `shared/utils` (Luhn, marca, máscaras, dinero).
+- Slices: `products`, `checkout` (paso y datos de entrega), `cardSession` (tarjeta **solo en memoria**), `quote` y `payment`.
+- redux-persist guarda **solo** `checkout` y `payment` (`whitelist`), con versión y migración: un estado viejo o corrupto vuelve a la pantalla de producto. Tras recargar, `resumeAfterReload` arregla el paso: si se recargó en pleno pago, busca la transacción por su `Idempotency-Key` persistida (`GET /transactions/by-key/:key`) y nunca paga dos veces; si estaba en el resumen sin tarjeta en memoria, vuelve al modal y la pide de nuevo. La pantalla de resultado retoma sola la consulta de una transacción PENDING.
 
 ## Estructura
 

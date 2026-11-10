@@ -42,7 +42,7 @@ Si el usuario recarga la página, la app recupera el paso en el que iba.
    - Códigos: 201 al crear, 400/422 si la validación falla, 404, 409 sin stock, 502 si la pasarela falla.
    - Los DTOs se validan con class-validator.
 9. **Stock consistente:** el stock se descuenta en una transacción de BD solo cuando el pago queda APPROVED, nunca baja de 0, y hay idempotencia por referencia.
-10. **Commits convencionales** (`feat:`, `fix:`, `test:`, `chore:`, `docs:`): una rama y un PR por spec.
+10. **Commits convencionales** (`feat:`, `fix:`, `test:`, `chore:`, `docs:`): una rama `feat/NNN-nombre` y un PR hacia `develop` por spec (ver *Git workflow*).
 
 ## Estructura
 
@@ -67,6 +67,49 @@ El detalle de cada flujo está en su skill de proyecto (`.claude/skills/`):
 - **`spec <nombre>`** → [`.claude/skills/spec/SKILL.md`](.claude/skills/spec/SKILL.md): spec.md con AC, plan.md y tasks.md, antes de escribir código.
 - **`ship <NNN>`** → [`.claude/skills/ship/SKILL.md`](.claude/skills/ship/SKILL.md): rama `feat/NNN-nombre` desde `develop`, TDD con un commit por tarea y PR de vuelta a `develop`.
 - **`verify`** → [`.claude/skills/verify/SKILL.md`](.claude/skills/verify/SKILL.md): ejecuta `scripts/verify.sh` y corrige hasta que pase.
+
+## Git workflow
+
+GitFlow ligero. **Nunca hagas `git push` sin que la persona lo pida.**
+
+| Rama | Para qué | Sale de | Vuelve a |
+|---|---|---|---|
+| `main` | Solo releases: lo que está desplegado. Cada merge dispara el despliegue | — | — |
+| `develop` | Integración (rama por defecto en GitHub) | `main` | `main` vía PR de release |
+| `feat/NNN-nombre` | Una spec (flujo `ship`) | `develop` | `develop` vía PR |
+| `hotfix/descripcion` | Arreglo urgente en producción | `main` | `main` **y** `develop` |
+
+- Los PR se integran con **merge commit** (`gh pr merge --merge`), nunca `--squash`, para conservar el historial por tarea.
+- **Release**: PR `develop → main`; tras el merge, tag anotado en `main` (`git tag -a v0.1.0 -m "…"`): `v0.1.0` = esqueleto desplegado, `v1.0.0` = entrega final.
+- **Hotfix**: `git checkout -b hotfix/x main` → PR a `main` → tag de parche (`v1.0.1`) → PR (o merge) de `main` a `develop`.
+- La CI (`.github/workflows/ci.yml`) corre en los PR y pushes hacia `develop` y `main`.
+
+```mermaid
+gitGraph
+  commit id: "chore: init"
+  branch develop
+  checkout develop
+  branch feat/001-catalogo-stock
+  checkout feat/001-catalogo-stock
+  commit id: "feat: T1"
+  commit id: "feat: T2"
+  checkout develop
+  merge feat/001-catalogo-stock
+  branch feat/002-tarjeta-entrega
+  checkout feat/002-tarjeta-entrega
+  commit id: "feat: T1 "
+  checkout develop
+  merge feat/002-tarjeta-entrega
+  checkout main
+  merge develop tag: "v0.1.0"
+  branch hotfix/cors
+  checkout hotfix/cors
+  commit id: "fix: cors"
+  checkout main
+  merge hotfix/cors tag: "v0.1.1"
+  checkout develop
+  merge main
+```
 
 ## Comandos
 

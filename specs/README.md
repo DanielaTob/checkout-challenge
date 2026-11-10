@@ -7,7 +7,7 @@
 | [003-resumen-pago](003-resumen-pago/spec.md) | Cotización en backend y backdrop de resumen | Implementada |
 | [004-transaccion-pasarela](004-transaccion-pasarela/spec.md) | Clientes, transacción, pasarela, entrega, stock y pantalla de resultado | Implementada |
 | [005-resiliencia](005-resiliencia/spec.md) | Recuperar el paso tras un refresh, idempotencia y timeouts | Implementada |
-| 006-despliegue | AWS, HTTPS y headers | Pendiente |
+| [006-despliegue](006-despliegue/spec.md) | AWS (Lambda + HTTP API, S3 + CloudFront), HTTPS y headers | Implementada |
 
 ## Contrato de API (visión global)
 

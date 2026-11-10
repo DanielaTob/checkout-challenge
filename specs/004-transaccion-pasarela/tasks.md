@@ -11,5 +11,5 @@
 - [x] T7 — `TransactionsController` (POST/GET) + DTOs + Swagger (AC-004-02, AC-004-05, AC-004-14)
 - [x] T8 — `GetDelivery` + controlador (AC-004-15)
 - [x] T9 — Test de no fuga de datos de tarjeta (AC-004-16)
-- [ ] T10 — Front: `paymentSlice` + thunks `payTransaction` / `pollTransaction` (AC-004-18, AC-004-20)
+- [x] T10 — Front: `paymentSlice` + thunks `payTransaction` / `pollTransaction` (AC-004-18, AC-004-20)
 - [ ] T11 — Front: `ResultScreen` y Volver a la tienda (AC-004-17, AC-004-19)

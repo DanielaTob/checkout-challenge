@@ -247,8 +247,8 @@
   align-items: center;
   gap: 16px;
   width: 100%;
-  max-width: 480px;
-  margin: 12px auto 0;
+  max-width: 520px;
+  margin: 12px auto 0; /* centered inside the shared 1080px container */
   padding: 32px 20px 24px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -346,4 +346,51 @@
   .stepper__button:hover:not(:disabled) {
     background: var(--color-accent);
   }
+}
+
+/* Reference: one line, monospaced, middle-truncated, with a copy button. */
+.reference {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.reference__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.reference__copy {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+.reference__copy:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .reference__copy:hover {
+    background: var(--color-accent);
+  }
+}
+.result__details dd .reference {
+  justify-content: flex-end;
+}
+.result__reference {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

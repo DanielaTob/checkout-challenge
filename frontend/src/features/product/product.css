@@ -114,7 +114,7 @@
 @media (min-width: 640px) {
   /* Centered columns of the same width, whatever the number of products. */
   .product-list {
-    grid-template-columns: repeat(auto-fit, minmax(260px, 340px));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 330px)); /* 3 × 330 + gaps fits the 1080px container */
     justify-content: center;
   }
   .product-list > .product-card--skeleton:nth-child(n + 2) {

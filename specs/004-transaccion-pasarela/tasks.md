@@ -2,7 +2,7 @@
 
 - [x] T0 — Probar el sandbox con curl: merchants, tokens, transactions, estado; anotar endpoints y tarjetas de prueba en `docs/adr/0003-contrato-pasarela.md`
 - [x] T1 — Migración (`idempotency_key`, `shipping`, `failure_reason`, email único) (AC-004-02)
-- [ ] T2 — Customer: dominio, repo, `CreateCustomer`, controlador (AC-004-01)
+- [x] T2 — Customer: dominio, repo, `CreateCustomer`, controlador (AC-004-01)
 - [ ] T3 — `validateCard` en dominio y `integritySignature` (AC-004-05, AC-004-06)
 - [ ] T4 — Adaptador HTTP de la pasarela con timeouts y mapeo de errores (AC-004-07, AC-004-13)
 - [ ] T5 — Repositorio de transacciones: `createPendingIfStock` con bloqueo de fila (AC-004-03, AC-004-21)

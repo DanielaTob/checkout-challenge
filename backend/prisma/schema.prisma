@@ -38,7 +38,7 @@ model Product {
 model Customer {
   id           String        @id @default(uuid()) @db.Uuid
   fullName     String        @map("full_name")
-  email        String
+  email        String        @unique
   phone        String
   createdAt    DateTime      @default(now()) @map("created_at")
   transactions Transaction[]
@@ -60,6 +60,10 @@ model Transaction {
   gatewayTransactionId String?           @map("gateway_transaction_id")
   cardBrand            String?           @map("card_brand")
   cardLast4            String?           @map("card_last4") @db.Char(4)
+  idempotencyKey       String?           @unique @map("idempotency_key")
+  /// Copy of the delivery address until the payment is APPROVED and the delivery exists.
+  shipping             Json?             @db.JsonB
+  failureReason        String?           @map("failure_reason")
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
   product              Product           @relation(fields: [productId], references: [id])

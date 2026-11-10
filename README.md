@@ -279,6 +279,117 @@ API Gateway corta a los ~30 s, así que la API se acota mucho antes:
 
 El front consulta cada 2 s hasta un estado final, como mucho 2 min (AC-004-18).
 
+## Calidad: cobertura y trazabilidad
+
+### Cobertura
+
+Jest en los dos paquetes, con umbral **≥ 80 %** en sentencias, ramas, funciones y líneas (lo aplica la config de Jest de cada paquete; si baja, `verify.sh` falla y no hay commit).
+
+| Paquete | Tests | Sentencias | Ramas | Funciones | Líneas |
+|---|---|---|---|---|---|
+| Backend (`backend/`) | 189 tests · 36 suites | **100 %** (677/677) | **91.54 %** (303/331) | **100 %** (133/133) | **100 %** (593/593) |
+| Frontend (`frontend/`) | 183 tests · 31 suites | **99.5 %** (609/612) | **93.68 %** (267/285) | **99.34 %** (152/153) | **100 %** (517/517) |
+
+```bash
+cd backend && npm run test:cov
+cd frontend && npm run test:cov
+```
+
+La CI publica en el *job summary* de cada PR el resumen de cobertura de los dos paquetes y la matriz de trazabilidad.
+
+### Trazabilidad: 67/67 criterios con test
+
+Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un test con ese ID en el nombre (`it('AC-004-12 …')`). [`scripts/trace.ts`](scripts/trace.ts) arma la matriz y falla si falta alguno; la CI la corre con `--shipped`.
+
+| Spec | Qué cubre | AC | Con test |
+|---|---|---|---|
+| [001 · catálogo y stock](specs/001-catalogo-stock/spec.md) | productos, stock, pantalla de producto | 10 | ✅ 10 |
+| [002 · tarjeta y entrega](specs/002-tarjeta-entrega/spec.md) | modal, Luhn, vencimiento, CVC, marca, datos de entrega | 11 | ✅ 11 |
+| [003 · resumen de pago](specs/003-resumen-pago/spec.md) | cotización en el backend, backdrop de resumen | 10 | ✅ 10 |
+| [004 · transacción con la pasarela](specs/004-transaccion-pasarela/spec.md) | clientes, transacción, pasarela, entrega, stock, resultado | 21 | ✅ 21 |
+| [005 · resiliencia](specs/005-resiliencia/spec.md) | recuperar el paso tras recargar, idempotencia, timeouts | 15 | ✅ 15 |
+| **Total** | | **67** | **✅ 67/67** |
+
+```bash
+npx tsx scripts/trace.ts             # matriz completa (todas las specs)
+npx tsx scripts/trace.ts --spec 004  # una spec
+```
+
+<details>
+<summary>Matriz completa AC → tests (salida de <code>scripts/trace.ts</code>)</summary>
+
+| AC | Archivo | Estado |
+|---|---|---|
+| AC-001-01 | backend/src/application/products/list-products.use-case.spec.ts<br>backend/src/infrastructure/http/products.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-product.repository.spec.ts | ✅ |
+| AC-001-02 | backend/src/application/products/get-product.use-case.spec.ts<br>backend/src/infrastructure/http/products.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-product.repository.spec.ts | ✅ |
+| AC-001-03 | backend/src/application/products/get-product.use-case.spec.ts<br>backend/src/infrastructure/http/products.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-product.repository.spec.ts | ✅ |
+| AC-001-04 | backend/src/infrastructure/http/products.controller.spec.ts | ✅ |
+| AC-001-05 | backend/src/infrastructure/prisma/seed-products.spec.ts | ✅ |
+| AC-001-06 | frontend/src/features/product/ProductList.test.tsx<br>frontend/src/shared/api/http.test.ts<br>frontend/src/shared/config.test.ts<br>frontend/src/shared/utils/money.test.ts | ✅ |
+| AC-001-07 | frontend/src/app/store.test.ts<br>frontend/src/features/product/ProductList.test.tsx<br>frontend/src/features/product/productsSlice.test.ts | ✅ |
+| AC-001-08 | frontend/src/features/product/ProductList.test.tsx | ✅ |
+| AC-001-09 | frontend/src/features/checkout/startCheckout.test.tsx | ✅ |
+| AC-001-10 | frontend/src/features/product/ProductImage.test.tsx | ✅ |
+| AC-002-01 | frontend/src/features/checkout/CheckoutDetails.fields.test.tsx<br>frontend/src/shared/utils/card.test.ts | ✅ |
+| AC-002-02 | frontend/src/features/checkout/CheckoutDetails.fields.test.tsx<br>frontend/src/shared/ui/BrandLogo.test.tsx<br>frontend/src/shared/utils/brand.test.ts | ✅ |
+| AC-002-03 | frontend/src/features/checkout/CheckoutDetails.fields.test.tsx<br>frontend/src/shared/utils/card.test.ts | ✅ |
+| AC-002-04 | frontend/src/features/checkout/CheckoutDetails.fields.test.tsx<br>frontend/src/shared/utils/cardFields.test.ts | ✅ |
+| AC-002-05 | frontend/src/features/checkout/CheckoutDetails.fields.test.tsx<br>frontend/src/shared/utils/cardFields.test.ts | ✅ |
+| AC-002-06 | frontend/src/features/checkout/CheckoutDetails.fields.test.tsx<br>frontend/src/shared/utils/cardFields.test.ts | ✅ |
+| AC-002-07 | frontend/src/features/checkout/CheckoutDetails.fields.test.tsx<br>frontend/src/shared/utils/delivery.test.ts | ✅ |
+| AC-002-08 | frontend/src/features/checkout/CheckoutDetails.flow.test.tsx | ✅ |
+| AC-002-09 | frontend/src/features/checkout/CheckoutDetails.flow.test.tsx<br>frontend/src/features/checkout/cardSession.test.ts | ✅ |
+| AC-002-10 | frontend/src/features/checkout/CheckoutDetails.flow.test.tsx<br>frontend/src/shared/ui/Modal.test.tsx | ✅ |
+| AC-002-11 | frontend/src/features/checkout/CheckoutDetails.fields.test.tsx<br>frontend/src/shared/ui/Modal.test.tsx | ✅ |
+| AC-003-01 | backend/src/application/quote/quote-checkout.use-case.spec.ts<br>backend/src/domain/quote/quote.spec.ts<br>backend/src/infrastructure/config/config-fees.provider.spec.ts<br>backend/src/infrastructure/http/products.controller.spec.ts | ✅ |
+| AC-003-02 | backend/src/application/quote/quote-checkout.use-case.spec.ts<br>backend/src/domain/quote/quote.spec.ts<br>backend/src/infrastructure/http/products.controller.spec.ts | ✅ |
+| AC-003-03 | backend/src/application/quote/quote-checkout.use-case.spec.ts<br>backend/src/domain/quote/quote.spec.ts<br>backend/src/infrastructure/http/products.controller.spec.ts | ✅ |
+| AC-003-04 | frontend/src/features/payment/SummarySheet.test.tsx<br>frontend/src/features/payment/quoteSlice.test.ts | ✅ |
+| AC-003-05 | frontend/src/features/payment/SummarySheet.test.tsx | ✅ |
+| AC-003-06 | frontend/src/features/payment/QuantityStepper.test.tsx | ✅ |
+| AC-003-07 | frontend/src/features/payment/PayButton.test.tsx | ✅ |
+| AC-003-08 | frontend/src/features/payment/PayButton.test.tsx | ✅ |
+| AC-003-09 | frontend/src/features/payment/SummarySheet.test.tsx<br>frontend/src/features/payment/quoteSlice.test.ts | ✅ |
+| AC-003-10 | frontend/src/features/payment/SummarySheet.test.tsx | ✅ |
+| AC-004-01 | backend/src/application/customers/create-customer.use-case.spec.ts<br>backend/src/infrastructure/http/customers.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-customer.repository.spec.ts | ✅ |
+| AC-004-02 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
+| AC-004-03 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-004-04 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-004-05 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/domain/payment/card.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
+| AC-004-06 | backend/src/domain/payment/signature.spec.ts | ✅ |
+| AC-004-07 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-004-08 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/application/transactions/poll-transaction-status.use-case.spec.ts<br>backend/src/domain/shared/clock.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
+| AC-004-09 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-004-10 | backend/src/application/transactions/apply-transaction-result.use-case.spec.ts<br>backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-004-11 | backend/src/application/transactions/apply-transaction-result.use-case.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-004-12 | backend/src/application/transactions/apply-transaction-result.use-case.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-004-13 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
+| AC-004-14 | backend/src/application/transactions/get-transaction.use-case.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-004-15 | backend/src/application/deliveries/get-delivery.use-case.spec.ts<br>backend/src/infrastructure/http/deliveries.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-delivery.repository.spec.ts | ✅ |
+| AC-004-16 | backend/src/test/card-leak.spec.ts | ✅ |
+| AC-004-17 | frontend/src/features/payment/ResultScreen.test.tsx | ✅ |
+| AC-004-18 | frontend/src/features/payment/ResultScreen.test.tsx<br>frontend/src/features/payment/paymentSlice.test.ts | ✅ |
+| AC-004-19 | frontend/src/features/payment/ResultScreen.test.tsx | ✅ |
+| AC-004-20 | frontend/src/features/payment/paymentSlice.test.ts | ✅ |
+| AC-004-21 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-005-01 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
+| AC-005-02 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
+| AC-005-03 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
+| AC-005-04 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
+| AC-005-05 | frontend/src/app/recoverPayment.test.tsx | ✅ |
+| AC-005-06 | frontend/src/app/noCardLeak.test.tsx | ✅ |
+| AC-005-07 | frontend/src/app/persistence.test.ts | ✅ |
+| AC-005-08 | frontend/src/app/persistence.test.ts<br>frontend/src/app/resumeAfterReload.test.tsx | ✅ |
+| AC-005-09 | backend/src/application/transactions/create-transaction.idempotency.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
+| AC-005-10 | backend/src/application/transactions/create-transaction.idempotency.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-005-11 | backend/src/infrastructure/gateway/gateway-config.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts | ✅ |
+| AC-005-12 | backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/gateway/retry.spec.ts | ✅ |
+| AC-005-13 | backend/src/application/transactions/get-transaction-by-key.use-case.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
+| AC-005-14 | backend/src/application/transactions/create-transaction.time-budget.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
+| AC-005-15 | backend/src/application/transactions/get-transaction.use-case.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
+
+</details>
+
 ## Estructura
 
 ```

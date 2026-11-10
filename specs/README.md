@@ -2,7 +2,7 @@
 
 | Spec | Qué cubre | Estado |
 |---|---|---|
-| [001-catalogo-stock](001-catalogo-stock/spec.md) | Productos, stock, pantalla de producto | Aprobada |
+| [001-catalogo-stock](001-catalogo-stock/spec.md) | Productos, stock, pantalla de producto | Implementada |
 | [002-tarjeta-entrega](002-tarjeta-entrega/spec.md) | Modal de tarjeta (Luhn, fecha, CVC, marca) y datos de entrega | Aprobada |
 | [003-resumen-pago](003-resumen-pago/spec.md) | Cotización en backend y backdrop de resumen | Aprobada |
 | [004-transaccion-pasarela](004-transaccion-pasarela/spec.md) | Clientes, transacción, pasarela, entrega, stock y pantalla de resultado | Aprobada |

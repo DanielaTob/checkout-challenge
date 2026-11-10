@@ -70,26 +70,6 @@
   background: repeating-linear-gradient(45deg, #e8ebf3 0 12px, #eef1f7 12px 24px);
 }
 
-/* Skeleton */
-.skeleton {
-  border-radius: 6px;
-  background: linear-gradient(90deg, #e8ebf3 25%, #f3f5fa 50%, #e8ebf3 75%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.2s ease-in-out infinite;
-}
-.skeleton--title { height: 1.25rem; width: 60%; }
-.skeleton--text { height: 0.875rem; width: 100%; }
-.skeleton--short { width: 40%; }
-.skeleton--button { height: 48px; width: 100%; margin-top: 8px; }
-
-@keyframes skeleton-shimmer {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
-}
 
 /* Two columns on wider screens */
 @media (min-width: 720px) {

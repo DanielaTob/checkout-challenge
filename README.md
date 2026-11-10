@@ -20,6 +20,7 @@ Checkout móvil de un producto pagado con tarjeta de crédito a través de una p
 
 ## Contenido
 
+- [Diseño](#diseño)
 - [Arquitectura](#arquitectura)
 - [Flujo de pago](#flujo-de-pago)
 - [Modelo de datos](#modelo-de-datos)
@@ -29,6 +30,35 @@ Checkout móvil de un producto pagado con tarjeta de crédito a través de una p
 - [Desarrollo](#desarrollo)
 - [Git workflow](#git-workflow)
 - [Desarrollo asistido por IA](#desarrollo-asistido-por-ia)
+
+## Diseño
+
+Interfaz mobile-first (desde iPhone SE 375×667) para una tienda de demostración, **Tienda Demo**: fondo crema `#F4F3EE`, superficies `#FAFAF7`, radios de 16–24 px, sombras suaves y el CTA principal en lima `#B5E61D` con texto `#111`. Header, stepper (1. Producto — 2. Datos — 3. Resumen — 4. Resultado) y contenido comparten un contenedor centrado de 1080 px.
+
+- **Producto**: tarjetas de igual altura con badge de stock ("Quedan N", ámbar con 5 o menos, "Agotado" con el botón deshabilitado) y el botón **Pay with credit card** alineado abajo.
+- **Tarjeta y entrega**: modal con bloques "Tarjeta" y "Entrega", logo VISA/MasterCard dentro del input, errores bajo cada campo y **Continuar** fijo abajo con scroll interno.
+- **Resumen**: bottom sheet sobre el producto atenuado en móvil; panel de dos columnas en desktop (producto con − n + y "Resumen del pedido").
+- **Resultado**: tarjeta centrada con ícono de estado, referencia en una línea (monoespaciada, truncada al medio, con botón de copiar), total y tarjeta enmascarada.
+- **Vuelta a la tienda**: la tarjeta cuyo stock cambió se resalta y se anuncia a lectores de pantalla.
+- **Accesibilidad**: contraste WCAG AA en todo el texto (mínimo 5,1:1), `focus-visible` en todos los controles, roles y `aria-*` en modales, errores y estados, transiciones de 150–220 ms que respetan `prefers-reduced-motion`. Sin fuentes ni recursos externos (la CSP de CloudFront solo permite `'self'`).
+
+Verificado con Playwright (Chromium) a 375×667 y 1280×800: sin desbordamiento horizontal ni errores de consola.
+
+### Móvil (375×667)
+
+| 1. Producto | 2. Tarjeta y entrega | 3. Resumen | 4. Resultado | 5. Stock actualizado |
+|---|---|---|---|---|
+| <img src="docs/screenshots/movil-1-producto.webp" width="170" alt="Pantalla de producto en móvil"> | <img src="docs/screenshots/movil-2-datos.webp" width="170" alt="Modal de tarjeta y entrega en móvil"> | <img src="docs/screenshots/movil-3-resumen.webp" width="170" alt="Resumen del pedido como bottom sheet en móvil"> | <img src="docs/screenshots/movil-4-aprobado.webp" width="170" alt="Pago aprobado en móvil"> | <img src="docs/screenshots/movil-5-stock-actualizado.webp" width="170" alt="Producto con el stock actualizado y resaltado en móvil"> |
+
+Pago rechazado: <img src="docs/screenshots/movil-4-rechazado.webp" width="170" alt="Pago rechazado en móvil">
+
+### Desktop (1280×800)
+
+| Producto | Tarjeta y entrega |
+|---|---|
+| <img src="docs/screenshots/desktop-1-producto.webp" alt="Pantalla de producto en desktop"> | <img src="docs/screenshots/desktop-2-datos.webp" alt="Modal de tarjeta y entrega en desktop"> |
+| **Resumen (dos columnas)** | **Resultado** |
+| <img src="docs/screenshots/desktop-3-resumen.webp" alt="Resumen del pedido en dos columnas en desktop"> | <img src="docs/screenshots/desktop-4-aprobado.webp" alt="Pago aprobado en desktop"> |
 
 ## Arquitectura
 
@@ -299,8 +329,8 @@ Jest en los dos paquetes, con umbral **≥ 80 %** en sentencias, ramas, funcione
 
 | Paquete | Tests | Sentencias | Ramas | Funciones | Líneas |
 |---|---|---|---|---|---|
-| Backend (`backend/`) | 189 tests · 36 suites | **100 %** (677/677) | **91.54 %** (303/331) | **100 %** (133/133) | **100 %** (593/593) |
-| Frontend (`frontend/`) | 183 tests · 31 suites | **99.5 %** (609/612) | **93.68 %** (267/285) | **99.34 %** (152/153) | **100 %** (517/517) |
+| Backend (`backend/`) | 194 tests · 38 suites | **100 %** (677/677) | **91.84 %** (304/331) | **100 %** (133/133) | **100 %** (593/593) |
+| Frontend (`frontend/`) | 198 tests · 34 suites | **99.54 %** (660/663) | **94.37 %** (302/320) | **99.4 %** (166/167) | **100 %** (562/562) |
 
 ```bash
 cd backend && npm run test:cov
@@ -309,7 +339,7 @@ cd frontend && npm run test:cov
 
 La CI publica en el *job summary* de cada PR el resumen de cobertura de los dos paquetes y la matriz de trazabilidad.
 
-### Trazabilidad: 67/67 criterios con test
+### Trazabilidad: 77/77 criterios con test
 
 Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un test con ese ID en el nombre (`it('AC-004-12 …')`). [`scripts/trace.ts`](scripts/trace.ts) arma la matriz y falla si falta alguno; la CI la corre con `--shipped`.
 
@@ -320,7 +350,8 @@ Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un 
 | [003 · resumen de pago](specs/003-resumen-pago/spec.md) | cotización en el backend, backdrop de resumen | 10 | ✅ 10 |
 | [004 · transacción con la pasarela](specs/004-transaccion-pasarela/spec.md) | clientes, transacción, pasarela, entrega, stock, resultado | 21 | ✅ 21 |
 | [005 · resiliencia](specs/005-resiliencia/spec.md) | recuperar el paso tras recargar, idempotencia, timeouts | 15 | ✅ 15 |
-| **Total** | | **67** | **✅ 67/67** |
+| [006 · despliegue](specs/006-despliegue/spec.md) | Lambda + HTTP API, S3 + CloudFront (OAC), HTTPS, headers, CORS | 10 | ✅ 10 |
+| **Total** | | **77** | **✅ 77/77** |
 
 ```bash
 npx tsx scripts/trace.ts             # matriz completa (todas las specs)
@@ -399,6 +430,16 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 | AC-005-13 | backend/src/application/transactions/get-transaction-by-key.use-case.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
 | AC-005-14 | backend/src/application/transactions/create-transaction.time-budget.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
 | AC-005-15 | backend/src/application/transactions/get-transaction.use-case.spec.ts<br>backend/src/infrastructure/gateway/http-payment-gateway.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
+| AC-006-01 | backend/src/lambda.spec.ts | ✅ |
+| AC-006-02 | backend/src/lambda.spec.ts | ✅ |
+| AC-006-03 | backend/src/configure-app.spec.ts | ✅ |
+| AC-006-04 | backend/src/configure-app.spec.ts | ✅ |
+| AC-006-05 | backend/src/configure-app.spec.ts | ✅ |
+| AC-006-06 | backend/src/infrastructure/config/env.spec.ts | ✅ |
+| AC-006-07 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-006-08 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-006-09 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-006-10 | frontend/src/shared/config.test.ts | ✅ |
 
 </details>
 

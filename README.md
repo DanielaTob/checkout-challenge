@@ -111,6 +111,141 @@ Las excepciones se reservan para lo que no es negocio (BD caída, invariantes ro
 - Slices: `products`, `checkout` (paso y datos de entrega), `cardSession` (tarjeta **solo en memoria**), `quote` y `payment`.
 - redux-persist guarda **solo** `checkout` y `payment` (`whitelist`), con versión y migración: un estado viejo o corrupto vuelve a la pantalla de producto. Tras recargar, `resumeAfterReload` arregla el paso: si se recargó en pleno pago, busca la transacción por su `Idempotency-Key` persistida (`GET /transactions/by-key/:key`) y nunca paga dos veces; si estaba en el resumen sin tarjeta en memoria, vuelve al modal y la pide de nuevo. La pantalla de resultado retoma sola la consulta de una transacción PENDING.
 
+## Flujo de pago
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Usuario
+  participant F as Front (SPA)
+  participant A as API (NestJS)
+  participant D as BD (PostgreSQL)
+  participant P as Pasarela (sandbox)
+
+  U->>F: Pagar
+  F->>F: genera Idempotency-Key y la persiste antes de enviar
+  F->>A: POST /customers
+  A->>D: upsert por email
+  A-->>F: 201 / 200 { id }
+  F->>A: POST /transactions (Idempotency-Key, producto, cantidad, entrega, tarjeta)
+
+  alt la clave ya existe
+    A->>D: busca por idempotency_key
+    A-->>F: 200 misma transacción (refrescada), sin volver a cobrar
+  else pedido nuevo
+    A->>A: valida tarjeta (Luhn, vencimiento, marca) → 422
+    A->>D: producto y cliente → 404
+    A->>A: buildQuote: subtotal + tarifa base + envío
+    rect rgba(127,127,127,0.12)
+      note over A,D: transacción de BD
+      A->>D: SELECT stock … FOR UPDATE
+      alt quantity > stock
+        A-->>F: 409 (no se guarda nada ni se llama a la pasarela)
+      else hay stock
+        A->>D: INSERT transacción PENDING (reference TX-uuid, montos, marca y últimos 4)
+      end
+    end
+    A->>P: GET /merchants/{llave pública} → acceptance tokens (un solo uso)
+    A->>P: POST /tokens/cards (número y CVC solo viajan aquí)
+    A->>P: POST /transactions (token, firma sha256, referencia, monto)
+    alt la pasarela falla o el tiempo se agota antes de cobrar
+      A->>D: estado ERROR + motivo
+      A-->>F: 502
+    else cobro creado
+      A->>D: guarda gateway_transaction_id
+      loop cada 1 s, hasta 10 veces y dentro de ~15 s
+        A->>P: GET /transactions/{id}
+      end
+      opt estado final
+        rect rgba(127,127,127,0.12)
+          note over A,D: applyResult (atómico e idempotente)
+          A->>D: UPDATE … WHERE status = 'PENDING'
+          alt APPROVED y stock ≥ cantidad
+            A->>D: stock -= cantidad e INSERT entrega PENDING
+          else APPROVED pero el stock se agotó durante el pago
+            A->>D: ERROR OUT_OF_STOCK_AFTER_PAYMENT
+          else DECLINED / ERROR
+            A->>D: guarda estado y motivo
+          end
+        end
+      end
+      A-->>F: 201 { status: APPROVED | DECLINED | ERROR | PENDING }
+    end
+  end
+
+  loop mientras siga PENDING (cada 2 s)
+    F->>A: GET /transactions/:id
+    A->>P: GET /transactions/{id} (≤ ~10 s)
+    A->>D: applyResult si ya es final
+    A-->>F: 200 estado actual
+  end
+  F-->>U: resultado → volver a la tienda (stock actualizado)
+```
+
+## Modelo de datos
+
+PostgreSQL (Neon) con Prisma; migraciones en `backend/prisma/migrations`. Los productos llegan por seed (no hay endpoint para crearlos). Montos en **centavos de COP** (`Int`).
+
+```mermaid
+erDiagram
+  products ||--o{ transactions : "se compra en"
+  customers ||--o{ transactions : "paga"
+  transactions ||--o| deliveries : "genera si APPROVED"
+  customers ||--o{ deliveries : "recibe"
+
+  products {
+    uuid id PK
+    text name
+    text description
+    text image_url
+    int price_in_cents
+    int stock "nunca < 0"
+    timestamp created_at
+    timestamp updated_at
+  }
+  customers {
+    uuid id PK
+    text full_name
+    text email UK
+    text phone
+    timestamp created_at
+  }
+  transactions {
+    uuid id PK
+    text reference UK "TX-uuid, la que ve la pasarela"
+    uuid product_id FK
+    uuid customer_id FK
+    int quantity
+    int amount_in_cents "total cobrado"
+    int base_fee_in_cents
+    int delivery_fee_in_cents
+    enum status "PENDING | APPROVED | DECLINED | ERROR"
+    text gateway_transaction_id
+    text card_brand "VISA | MASTERCARD"
+    char4 card_last4
+    text idempotency_key UK "nullable"
+    jsonb shipping "dirección hasta crear la entrega"
+    text failure_reason "nullable"
+    timestamp created_at
+    timestamp updated_at
+  }
+  deliveries {
+    uuid id PK
+    uuid transaction_id FK,UK
+    uuid customer_id FK
+    text address
+    text city
+    text region
+    text postal_code
+    enum status "PENDING | DISPATCHED | DELIVERED"
+    timestamp created_at
+  }
+```
+
+- De la tarjeta solo se guardan `card_brand` y `card_last4`. El número y el CVC solo viajan a la pasarela para tokenizarse.
+- `subtotal = amount_in_cents − base_fee_in_cents − delivery_fee_in_cents`; los tres montos se calculan en el backend y quedan congelados en la transacción.
+- `deliveries.transaction_id` es único: como mucho una entrega por pago, aunque el resultado se aplique dos veces.
+
 ## Estructura
 
 ```

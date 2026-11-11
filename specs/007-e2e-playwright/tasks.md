@@ -5,4 +5,4 @@
 - [x] T3 — E2E: compra aprobada y rechazada (AC-007-01, AC-007-02, AC-007-05)
 - [x] T4 — E2E: recarga en el resumen y durante el pago (AC-007-03, AC-007-04, AC-007-05)
 - [x] T5 — Job `e2e` en la CI con el reporte como artefacto si falla (AC-007-06)
-- [ ] T6 — README: cómo correr los E2E desde cero
+- [x] T6 — README: cómo correr los E2E desde cero

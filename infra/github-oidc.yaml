@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CD bootstrap for checkout-challenge (deployed once by hand, us-east-2): GitHub Actions OIDC
+  provider, the role the deploy workflow assumes (no AWS keys in GitHub) and the CloudFormation
+  execution role that actually changes the app stack. Least privilege: the GitHub role can only
+  run change sets on the app stack (passing the execution role), upload artifacts and the SPA,
+  and invalidate CloudFront; the execution role is scoped to the project's resources.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: checkout-challenge
+  GitHubRepository:
+    Type: String
+    Default: DanielaTob/checkout-challenge
+  GitHubEnvironment:
+    Type: String
+    Default: production
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: false if the account already has the token.actions.githubusercontent.com provider
+
+Conditions:
+  CreateProvider: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  # Assumed by .github/workflows/deploy.yml, only from the `production` environment of this repo.
+  GitHubDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-github-deploy'
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepository}:environment:${GitHubEnvironment}'
+      Policies:
+        - PolicyName: deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AppStackChangeSets
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:GetTemplateSummary
+                Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}/*'
+              - Sid: ValidateTemplate
+                Effect: Allow
+                Action: cloudformation:ValidateTemplate
+                Resource: '*'
+              - Sid: PassOnlyTheExecutionRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+                Condition:
+                  StringEquals: { iam:PassedToService: cloudformation.amazonaws.com }
+              - Sid: Buckets
+                Effect: Allow
+                Action: [s3:ListBucket, s3:GetBucketLocation]
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ProjectName}-artifacts-${AWS::AccountId}-${AWS::Region}'
+                  - !Sub 'arn:aws:s3:::${ProjectName}-web-${AWS::AccountId}'
+              - Sid: Objects
+                Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ProjectName}-artifacts-${AWS::AccountId}-${AWS::Region}/*'
+                  - !Sub 'arn:aws:s3:::${ProjectName}-web-${AWS::AccountId}/*'
+              - Sid: InvalidateSpa
+                Effect: Allow
+                Action: [cloudfront:CreateInvalidation, cloudfront:GetInvalidation]
+                Resource: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/*'
+
+  # Used by CloudFormation (passed with --role-arn) to create/update/rollback the app stack.
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-cfn-exec'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudformation.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: app-stack
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: Lambda
+                Effect: Allow
+                Action: lambda:*
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
+              - Sid: HttpApi
+                Effect: Allow
+                Action: apigateway:*
+                Resource:
+                  - !Sub 'arn:aws:apigateway:${AWS::Region}::/apis'
+                  - !Sub 'arn:aws:apigateway:${AWS::Region}::/apis/*'
+                  - !Sub 'arn:aws:apigateway:${AWS::Region}::/tags/*'
+              - Sid: FunctionRole
+                Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:UpdateRole
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PassRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'
+              - Sid: Buckets
+                Effect: Allow
+                Action: s3:*
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ProjectName}-*'
+                  - !Sub 'arn:aws:s3:::${ProjectName}-*/*'
+              - Sid: CloudFront
+                Effect: Allow
+                Action: cloudfront:*
+                Resource: '*'
+              - Sid: Logs
+                Effect: Allow
+                Action: logs:*
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-*'
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-*:*'
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/apigateway/${ProjectName}-*'
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/apigateway/${ProjectName}-*:*'
+              - Sid: LogsAccountLevel # API Gateway access logs and DescribeLogGroups have no resource scoping
+                Effect: Allow
+                Action:
+                  - logs:DescribeLogGroups
+                  - logs:CreateLogDelivery
+                  - logs:GetLogDelivery
+                  - logs:UpdateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:DescribeResourcePolicies
+                Resource: '*'
+              - Sid: DashboardsAndAlarms
+                Effect: Allow
+                Action:
+                  - cloudwatch:PutDashboard
+                  - cloudwatch:GetDashboard
+                  - cloudwatch:DeleteDashboards
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:TagResource
+                  - cloudwatch:UntagResource
+                  - cloudwatch:ListTagsForResource
+                Resource: '*'
+              - Sid: LambdaCodeFromArtifacts
+                Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub 'arn:aws:s3:::${ProjectName}-artifacts-${AWS::AccountId}-${AWS::Region}/*'
+
+Outputs:
+  GitHubDeployRoleArn:
+    Value: !GetAtt GitHubDeployRole.Arn
+  CloudFormationExecutionRoleArn:
+    Value: !GetAtt CloudFormationExecutionRole.Arn

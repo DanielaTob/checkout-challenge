@@ -330,7 +330,7 @@ Jest en los dos paquetes, con umbral **≥ 80 %** en sentencias, ramas, funcione
 | Paquete | Tests | Sentencias | Ramas | Funciones | Líneas |
 |---|---|---|---|---|---|
 | Backend (`backend/`) | 194 tests · 38 suites | **100 %** (677/677) | **91.84 %** (304/331) | **100 %** (133/133) | **100 %** (593/593) |
-| Frontend (`frontend/`) | 198 tests · 34 suites | **99.54 %** (660/663) | **94.37 %** (302/320) | **99.4 %** (166/167) | **100 %** (562/562) |
+| Frontend (`frontend/`) | 203 tests · 35 suites | **99.54 %** (661/664) | **95.04 %** (307/323) | **99.4 %** (166/167) | **100 %** (563/563) |
 
 ```bash
 cd backend && npm run test:cov
@@ -339,7 +339,39 @@ cd frontend && npm run test:cov
 
 La CI publica en el *job summary* de cada PR el resumen de cobertura de los dos paquetes y la matriz de trazabilidad.
 
-### Trazabilidad: 77/77 criterios con test
+### Pruebas E2E (Playwright)
+
+El flujo completo se prueba en **Chromium, Firefox y WebKit** (el motor de Safari) a **375×667** (iPhone SE), contra el build de producción del front (`vite build` + `vite preview`). La API se simula dentro del navegador ([`frontend/e2e/mockApi.ts`](frontend/e2e/mockApi.ts)) con estado propio, así que los E2E **no tocan la base de Neon ni la pasarela** y dan siempre el mismo resultado. Spec: [`specs/007-e2e-playwright`](specs/007-e2e-playwright/spec.md).
+
+| Escenario | Qué comprueba |
+|---|---|
+| Tarjeta aprobada `4242…` | resumen (producto + tarifa base + envío) → «¡Pago aprobado!» con referencia y tarjeta enmascarada → «Quedan 9» al volver |
+| Tarjeta rechazada `4111…` | «Pago rechazado» con el motivo; el stock no cambia |
+| Recarga en el resumen | vuelve al formulario con la entrega conservada y la tarjeta vacía; se reingresa y se paga |
+| Recarga durante el pago | recupera el pago por su `Idempotency-Key`, sin un segundo `POST /transactions` |
+
+En todos: sin desbordamiento horizontal, sin errores en la consola y sin el número de tarjeta ni el CVC en `localStorage`.
+
+**Cómo correrlos desde cero** (desde la raíz del repo; los mismos scripts existen dentro de `frontend/`):
+
+```bash
+npm install --prefix frontend      # instala @playwright/test con el resto de dependencias
+npm run e2e:install                # descarga Chromium, Firefox y WebKit (unos cientos de MB, una sola vez; en Linux instala también las librerías del sistema)
+npm run e2e                        # los 3 navegadores, sin ventana (~15 s); construye y levanta el front solo
+npm run e2e:headed                 # solo Chromium, con ventana y 500 ms entre acciones para verlo en vivo
+E2E_SLOWMO=1000 npm run e2e:headed # más lento todavía
+npm run e2e:ui                     # modo UI de Playwright: elegir tests, ver cada paso, el DOM y la red
+npm run e2e:report                 # abre el reporte HTML de la última ejecución
+npm run e2e -- --project=webkit    # cualquier opción de Playwright va después de --
+```
+
+No hace falta levantar el backend ni tener `.env`: el front se construye con `VITE_API_URL=http://api.mock` y Playwright intercepta esas peticiones. El reporte queda en `frontend/playwright-report/` y las trazas, capturas y videos de los fallos en `frontend/test-results/` (ambos ignorados por git).
+
+En la CI, el job **`e2e`** corre en paralelo con `verify` en cada PR y push a `develop`/`main`. Si falla, sube `playwright-report/` y `test-results/` como artefacto **`playwright-report`** (14 días): se descarga desde la pestaña *Summary* del run y se abre con `npx playwright show-report <carpeta>`.
+
+> Los E2E encontraron un bug que los tests de Jest no veían: Firefox y Safari cortan el `fetch` en vuelo al recargar, el pago se guardaba como fallido y, al volver, la app pedía la tarjeta en vez de recuperar el pago. Ahora también se busca por `Idempotency-Key` en ese caso (AC-005-05).
+
+### Trazabilidad: 83/83 criterios con test
 
 Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un test con ese ID en el nombre (`it('AC-004-12 …')`). [`scripts/trace.ts`](scripts/trace.ts) arma la matriz y falla si falta alguno; la CI la corre con `--shipped`.
 
@@ -351,7 +383,8 @@ Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un 
 | [004 · transacción con la pasarela](specs/004-transaccion-pasarela/spec.md) | clientes, transacción, pasarela, entrega, stock, resultado | 21 | ✅ 21 |
 | [005 · resiliencia](specs/005-resiliencia/spec.md) | recuperar el paso tras recargar, idempotencia, timeouts | 15 | ✅ 15 |
 | [006 · despliegue](specs/006-despliegue/spec.md) | Lambda + HTTP API, S3 + CloudFront (OAC), HTTPS, headers, CORS | 10 | ✅ 10 |
-| **Total** | | **77** | **✅ 77/77** |
+| [007 · E2E con Playwright](specs/007-e2e-playwright/spec.md) | flujo completo en Chromium, Firefox y WebKit con la API simulada, job `e2e` en la CI | 6 | ✅ 6 |
+| **Total** | | **83** | **✅ 83/83** |
 
 ```bash
 npx tsx scripts/trace.ts             # matriz completa (todas las specs)
@@ -440,6 +473,12 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 | AC-006-08 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
 | AC-006-09 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
 | AC-006-10 | frontend/src/shared/config.test.ts | ✅ |
+| AC-007-01 | frontend/e2e/checkout.spec.ts | ✅ |
+| AC-007-02 | frontend/e2e/checkout.spec.ts | ✅ |
+| AC-007-03 | frontend/e2e/checkout.spec.ts | ✅ |
+| AC-007-04 | frontend/e2e/checkout.spec.ts | ✅ |
+| AC-007-05 | frontend/e2e/checkout.spec.ts | ✅ |
+| AC-007-06 | frontend/src/test/e2eSetup.test.ts | ✅ |
 
 </details>
 
@@ -456,6 +495,7 @@ frontend/src/
   app/                 store, persistencia, rehidratación por paso
   features/            product/, checkout/, payment/ (slice + componentes + tests)
   shared/              ui/, utils/ (Luhn, marca, dinero), api/
+frontend/e2e/          E2E con Playwright: API simulada, helpers y flujos (playwright.config.ts al lado)
 specs/NNN-nombre/      spec.md · plan.md · tasks.md por funcionalidad
 docs/                  contexto.md · adr/ · postman.json
 infra/                 template.yaml (CloudFormation)

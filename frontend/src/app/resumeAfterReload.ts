@@ -5,7 +5,8 @@ import type { RootState } from './store';
 
 /**
  * Runs once when the app starts (after redux-persist rehydrated) and fixes up the step:
- * - a payment was in flight → look it up by its persisted Idempotency-Key (never pay twice).
+ * - a payment was in flight (or failed on the summary, e.g. aborted by the reload) → look it up
+ *   by its persisted Idempotency-Key (never pay twice).
  * - summary without the in-memory card → back to the modal asking for the card again.
  * - details / result need nothing: the modal reopens with delivery data, and the result
  *   screen resumes polling a PENDING transaction by itself.
@@ -14,8 +15,12 @@ export const resumeAfterReload = createAsyncThunk<void, void, { state: RootState
   'app/resumeAfterReload',
   (_, { getState, dispatch }) => {
     const { checkout, cardSession, payment } = getState();
-    if (payment.status === 'paying' && payment.idempotencyKey) {
-      // The page was reloaded while a payment was in flight.
+    // Firefox and Safari abort the in-flight request when the page unloads, so the payment can
+    // be persisted as 'failed' (network error) instead of 'paying' right before the reload.
+    const interrupted =
+      payment.status === 'paying' || (payment.status === 'failed' && checkout.step === 'summary');
+    if (interrupted && payment.idempotencyKey) {
+      // The page was reloaded while a payment was in flight: look it up, never pay again.
       void dispatch(recoverPayment(payment.idempotencyKey));
       return;
     }

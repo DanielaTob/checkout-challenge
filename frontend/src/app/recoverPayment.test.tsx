@@ -51,6 +51,24 @@ describe('payment in flight during a reload', () => {
     expect(store.getState().payment.status).toBe('succeeded');
   });
 
+  it('AC-005-05 a payment aborted by the reload (Firefox/Safari persist it as failed) is also looked up by its key', async () => {
+    answer(() => Promise.resolve(aTransaction({ status: 'APPROVED' })));
+    const aborted = { ...inFlight, status: 'failed' as const, error: 'La pasarela no respondió, no se hizo ningún cobro. Intenta de nuevo.' };
+    renderWithStore(<App />, { checkout: summaryCheckout(), payment: aborted });
+    expect(await screen.findByRole('heading', { name: '¡Pago aprobado!' })).toBeInTheDocument();
+    expect(getJson).toHaveBeenCalledWith(byKey, expect.anything());
+    expect(postJson).not.toHaveBeenCalled();
+  });
+
+  it('AC-005-05 a failed payment outside the summary is not looked up again', async () => {
+    answer(() => Promise.resolve(aTransaction({ status: 'APPROVED' })));
+    const failed = { ...inFlight, status: 'failed' as const, error: 'x' };
+    const { store } = renderWithStore(<App />, { checkout: { ...summaryCheckout(), step: 'details' }, payment: failed });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(getJson).not.toHaveBeenCalledWith(byKey, expect.anything());
+    expect(store.getState().checkout.step).toBe('details');
+  });
+
   it('AC-005-05 a recovered PENDING payment goes to the result screen to keep polling', async () => {
     answer(() => Promise.resolve(aTransaction({ status: 'PENDING' })));
     renderWithStore(<App />, { checkout: summaryCheckout(), payment: inFlight });

@@ -87,6 +87,37 @@ describe('infra/template.yaml', () => {
     );
   });
 
+  it('AC-008-01 CloudFront adds Cross-Origin-Opener-Policy and Cross-Origin-Resource-Policy (same-origin)', () => {
+    const headers = resource('SecurityHeadersPolicy');
+    expect(headers).toMatch(
+      /Header: Cross-Origin-Opener-Policy, Value: same-origin, Override: true/,
+    );
+    expect(headers).toMatch(
+      /Header: Cross-Origin-Resource-Policy, Value: same-origin, Override: true/,
+    );
+  });
+
+  it('AC-008-02 CloudFront adds a Permissions-Policy that disables unused powerful features', () => {
+    expect(resource('SecurityHeadersPolicy')).toMatch(
+      /Header: Permissions-Policy, Value: 'camera=\(\), microphone=\(\), geolocation=\(\), usb=\(\), payment=\(\)', Override: true/,
+    );
+  });
+
+  it('AC-008-03 the new headers keep the AC-006-08 ones and COEP is not declared', () => {
+    const headers = resource('SecurityHeadersPolicy');
+    expect(headers).toContain('SecurityHeadersConfig:');
+    expect(headers).toContain('CustomHeadersConfig:');
+    for (const h of [
+      'StrictTransportSecurity',
+      'ContentTypeOptions',
+      'FrameOptions',
+      'ReferrerPolicy',
+      'ContentSecurityPolicy',
+    ])
+      expect(headers).toContain(h);
+    expect(template).not.toMatch(/Cross-Origin-Embedder-Policy/);
+  });
+
   it('AC-006-09 the Lambda runs outside a VPC on arm64, secrets are NoEcho and CORS comes from CloudFront', () => {
     const fn = resource('ApiFunction');
     expect(fn).toContain('Type: AWS::Lambda::Function');

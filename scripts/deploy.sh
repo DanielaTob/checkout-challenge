@@ -45,6 +45,11 @@ scripts/build-lambda.sh
 echo "▶ cloudformation package + deploy"
 aws cloudformation package --template-file infra/template.yaml --s3-bucket "$ARTIFACTS" \
   --s3-prefix backend --output-template-file .build/packaged.yaml >/dev/null
+# In CI the user has no Lambda/API Gateway/IAM rights: without the execution role CloudFormation
+# would fail late with an unclear AccessDenied, so fail fast instead.
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  : "${CFN_EXEC_ROLE_ARN:?missing CFN_EXEC_ROLE_ARN (variable of the production environment)}"
+fi
 ROLE_ARGS=()
 [[ -n "${CFN_EXEC_ROLE_ARN:-}" ]] && ROLE_ARGS=(--role-arn "$CFN_EXEC_ROLE_ARN")
 aws cloudformation deploy --stack-name "$STACK" --template-file .build/packaged.yaml \

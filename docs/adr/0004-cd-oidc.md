@@ -38,7 +38,7 @@ sin guardar llaves de AWS en GitHub.
   environment).
 - **Si el smoke test falla tras desplegar:** el job queda en rojo y la versión nueva ya está
   publicada. Para volver atrás, PR de `git revert` del merge en `main` (hotfix); su merge
-  redespliega la versión anterior. CloudFormation solo hace rollback solo si falla el propio
+  redespliega la versión anterior. CloudFormation solo hace rollback si falla el propio
   `deploy`.
 
 - Un fallo de permisos del rol de ejecución hace rollback del stack; los permisos se amplían en

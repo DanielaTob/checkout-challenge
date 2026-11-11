@@ -7,6 +7,9 @@ name: CI
 #         ├─────────────────────────────────┤                ├─ build ─ e2e
 #   typecheck ┘                             └─ test-frontend ┘
 #   security (gitleaks · forbidden word · npm audit)      trace (AC → tests)
+#
+# On a push to main (release/hotfix merge) and only with every stage green, the `deploy` job
+# runs .github/workflows/deploy.yml (CD to AWS through OIDC).
 on:
   pull_request:
     branches: [develop, main]
@@ -18,7 +21,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run on develop/main: it may be deploying.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -143,3 +147,12 @@ jobs:
             frontend/playwright-report/
             frontend/test-results/
           retention-days: 14
+
+  deploy:
+    needs: [e2e, security, trace]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit

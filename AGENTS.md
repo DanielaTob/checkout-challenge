@@ -83,6 +83,7 @@ GitFlow ligero. **Nunca hagas `git push` sin que la persona lo pida.**
 - Los PR se integran con **merge commit** (`gh pr merge --merge`), nunca `--squash`, para conservar el historial por tarea.
 - **Release**: PR `develop → main`; tras el merge, tag anotado en `main` (`git tag -a v0.1.0 -m "…"`): `v0.1.0` = esqueleto desplegado, `v1.0.0` = entrega final.
 - **Hotfix**: `git checkout -b hotfix/x main` → PR a `main` → tag de parche (`v1.0.1`) → PR (o merge) de `main` a `develop`.
+- **CD:** cada push a `main` con todas las etapas de la CI en verde dispara el job `deploy` (`.github/workflows/deploy.yml`, environment `production`, solo `main`). Asume por OIDC el rol `checkout-challenge-github-deploy` (`infra/github-oidc.yaml`, sin llaves de AWS en GitHub), ejecuta `scripts/deploy.sh` y hace smoke test. No despliegues a mano salvo emergencia.
 - La CI (`.github/workflows/ci.yml`) corre en los PR y pushes hacia `develop` y `main`, por etapas: `lint` + `typecheck` → `test-backend` + `test-frontend` → `build` → `e2e`, con `security` y `trace` en paralelo. Cada job llama a una sección de `scripts/verify.sh`; no dupliques lógica en el YAML.
 
 ```mermaid
@@ -126,6 +127,7 @@ cd frontend && npm run test:cov
 cd backend && npm run db:migrate && npm run db:seed
 scripts/build-lambda.sh            # bundle de la Lambda en .build/ (poda peers y motores no usados)
 scripts/deploy.sh                  # despliegue completo con CloudFormation (requiere aws configure y backend/.env.production)
+scripts/smoke-test.sh <api> <web>  # /health + el front renderiza contra esa API (lo corre el CD tras desplegar)
 ```
 
 ## Lo que un agente NO debe hacer

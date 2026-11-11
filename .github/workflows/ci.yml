@@ -75,6 +75,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # full history for gitleaks and the forbidden-word scan
+      - uses: actions/setup-node@v5
+        with: { node-version: 24 } # same npm as the other jobs for a reproducible audit
       - name: Install gitleaks
         run: |
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \

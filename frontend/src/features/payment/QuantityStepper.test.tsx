@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { headphones, quoteFor, summaryCheckout } from '../../test/fixtures';
 import { renderWithStore } from '../../test/renderWithStore';
-import { SummarySheet } from './SummarySheet';
+import { SummaryBackdrop } from './SummaryBackdrop';
 
 jest.mock('../../shared/api/http', () => ({
   ...jest.requireActual<typeof import('../../shared/api/http')>('../../shared/api/http'),
@@ -12,10 +12,14 @@ jest.mock('../../shared/api/http', () => ({
 const { getJson } = jest.requireMock<{ getJson: jest.Mock }>('../../shared/api/http');
 
 const setup = (stock = headphones.stock, quantity = 1) =>
-  renderWithStore(<SummarySheet />, {
+  renderWithStore(<SummaryBackdrop />, {
     checkout: summaryCheckout({ quantity }),
     products: { items: [{ ...headphones, stock }], status: 'succeeded', error: null },
   });
+
+/** The quantity selector and "Editar datos" live in the back layer (spec 009): reveal it first. */
+const revealBackLayer = async () =>
+  userEvent.click(await screen.findByRole('button', { name: /Resumen del pedido/, expanded: true }));
 
 describe('QuantityStepper', () => {
   beforeEach(() => {
@@ -26,6 +30,7 @@ describe('QuantityStepper', () => {
   it('AC-003-06 + re-quotes with the new quantity and updates the store', async () => {
     const { store } = setup();
     await screen.findByText('Total');
+    await revealBackLayer();
     await userEvent.click(screen.getByRole('button', { name: 'Aumentar cantidad' }));
     expect(store.getState().checkout.quantity).toBe(2);
     expect(await screen.findByText('Cantidad: 2')).toBeInTheDocument();
@@ -35,6 +40,7 @@ describe('QuantityStepper', () => {
   it('AC-003-06 − is disabled at 1 and + is disabled when quantity reaches the stock', async () => {
     setup(2, 1);
     await screen.findByText('Total');
+    await revealBackLayer();
     expect(screen.getByRole('button', { name: 'Disminuir cantidad' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Aumentar cantidad' }));
     expect(screen.getByRole('button', { name: 'Aumentar cantidad' })).toBeDisabled();
@@ -45,6 +51,7 @@ describe('QuantityStepper', () => {
   it('AC-003-06 + is capped at 10 even with more stock', async () => {
     setup(50, 10);
     await screen.findByText('Total');
+    await revealBackLayer();
     expect(screen.getByRole('button', { name: 'Aumentar cantidad' })).toBeDisabled();
   });
 });

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { CheckoutDetails } from '../features/checkout/CheckoutDetails';
 import { startCheckout } from '../features/checkout/checkoutSlice';
 import { ResultScreen } from '../features/payment/ResultScreen';
-import { SummarySheet } from '../features/payment/SummarySheet';
+import { SummaryBackdrop } from '../features/payment/SummaryBackdrop';
 import { ProductList } from '../features/product/ProductList';
 import { CheckoutProgress } from './CheckoutProgress';
 import { useAppDispatch, useAppSelector } from './hooks';
@@ -34,12 +34,13 @@ export function App() {
       <main className="app__main" data-step={step}>
         {step === 'result' ? (
           <ResultScreen />
+        ) : step === 'summary' ? (
+          <SummaryBackdrop />
         ) : (
           <ProductList onPay={(product) => dispatch(startCheckout({ productId: product.id }))} />
         )}
       </main>
       {step === 'details' && <CheckoutDetails />}
-      {step === 'summary' && <SummarySheet />}
     </div>
   );
 }

@@ -15,7 +15,7 @@ Checkout móvil de un producto pagado con tarjeta de crédito a través de una p
 - **Base de datos**: PostgreSQL serverless (Neon) con Prisma, conexión SSL.
 - **Nube (AWS)**: front en S3 privado + CloudFront (OAC, HTTPS); back en Lambda (fuera de la VPC) + API Gateway HTTP API. Infraestructura en CloudFormation ([`infra/template.yaml`](infra/template.yaml)).
 - **Seguridad**: HTTPS en ambos extremos; CloudFront agrega HSTS (`max-age=63072000; preload`), CSP `default-src 'self'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Cross-Origin-Opener-Policy` y `Cross-Origin-Resource-Policy` (`same-origin`) y una `Permissions-Policy` que apaga cámara, micrófono, geolocalización, USB y Payment Request; la API usa `helmet`, CORS restringido al dominio del front y validación estricta de DTOs (`whitelist` + `forbidNonWhitelisted`). La tarjeta se tokeniza en la pasarela: el número y el CVC nunca se guardan, ni se loguean, ni llegan a `localStorage` (hay tests que lo prueban).
-- **[HTTP Observatory de MDN](https://developer.mozilla.org/en-US/observatory/analyze?host=d3uvn5ovkcpvxw.cloudfront.net)** (escaneo del front del **2026-11-11**): **A+ · 115/100 · 12/12 tests superados**. El informe marcaba COOP, CORP y COEP como no implementados (sin penalización): v1.0.1 agrega COOP, CORP y `Permissions-Policy` ([spec 008](specs/008-headers-seguridad/spec.md)). COEP (`require-corp`) se deja fuera a propósito: solo sirve para aislar el origen (`SharedArrayBuffer`), que la app no usa.
+- **[HTTP Observatory de MDN](https://developer.mozilla.org/en-US/observatory/analyze?host=d3uvn5ovkcpvxw.cloudfront.net)** (escaneo del front del **2026-11-11**, con v1.0.1 desplegada): **A+ · 135/100 · 12/12 tests superados**. Con v1.0.0 sacaba A+ · 115/100: el informe marcaba COOP, CORP y COEP como no implementados, y v1.0.1 agregó COOP, CORP y `Permissions-Policy` ([spec 008](specs/008-headers-seguridad/spec.md)). COEP (`require-corp`) se deja fuera a propósito: solo sirve para aislar el origen (`SharedArrayBuffer`), que la app no usa.
 
 **Tarjetas del sandbox**: `4242 4242 4242 4242` → aprobada · `4111 1111 1111 1111` → rechazada (cualquier CVC de 3 dígitos y fecha futura).
 
@@ -38,28 +38,32 @@ Interfaz mobile-first (desde iPhone SE 375×667) para una tienda de demostració
 
 - **Producto**: tarjetas de igual altura con badge de stock ("Quedan N", ámbar con 5 o menos, "Agotado" con el botón deshabilitado) y el botón **Pay with credit card** alineado abajo.
 - **Tarjeta y entrega**: modal con bloques "Tarjeta" y "Entrega", logo VISA/MasterCard dentro del input, errores bajo cada campo y **Continuar** fijo abajo con scroll interno.
-- **Resumen**: bottom sheet sobre el producto atenuado en móvil; panel de dos columnas en desktop (producto con − n + y "Resumen del pedido").
+- **Resumen**: componente [Backdrop de Material](https://m2.material.io/components/backdrop) ([spec 009](specs/009-backdrop-resumen/spec.md)), igual en móvil y desktop. La **capa trasera** tiene el producto, el selector − n + y **Editar datos**. La **capa delantera** va anclada abajo, ocupa todo el ancho del contenedor, tiene esquinas superiores de 16 px y el subencabezado «Resumen del pedido», con el desglose, la tarjeta enmascarada y **Pagar**. El subencabezado (o su chevron) cambia la capa activa: con la trasera activa, la delantera muestra solo el subencabezado y el total, con un scrim suave. **Esc** vuelve a la delantera. En desktop no hay diálogo centrado: el mismo patrón vive en el contenedor de 1080 px y la delantera usa dos columnas.
 - **Resultado**: tarjeta centrada con ícono de estado, referencia en una línea (monoespaciada, truncada al medio, con botón de copiar), total y tarjeta enmascarada.
 - **Vuelta a la tienda**: la tarjeta cuyo stock cambió se resalta y se anuncia a lectores de pantalla.
-- **Accesibilidad**: contraste WCAG AA en todo el texto (mínimo 5,1:1), `focus-visible` en todos los controles, roles y `aria-*` en modales, errores y estados, transiciones de 150–220 ms que respetan `prefers-reduced-motion`. Sin fuentes ni recursos externos (la CSP de CloudFront solo permite `'self'`).
+- **Accesibilidad**: contraste WCAG AA en todo el texto (mínimo 5,1:1), `focus-visible` en todos los controles, roles y `aria-*` en modales, errores y estados (`aria-expanded`/`aria-controls` en el backdrop, con el foco siguiendo a la capa activa), transiciones de 150–220 ms que respetan `prefers-reduced-motion`. Sin fuentes ni recursos externos (la CSP de CloudFront solo permite `'self'`).
 
-Verificado con Playwright (Chromium) a 375×667 y 1280×800: sin desbordamiento horizontal ni errores de consola.
+Verificado con Playwright a 375×667 y 1280×800 (los E2E corren en Chromium, Firefox y WebKit): sin desbordamiento horizontal ni errores de consola, y **Pagar** visible sin scroll a 375×667. Las capturas son de la versión v1.1.0, con la API simulada.
 
 ### Móvil (375×667)
 
-| 1. Producto | 2. Tarjeta y entrega | 3. Resumen | 4. Resultado | 5. Stock actualizado |
+| 1. Producto | 2. Tarjeta y entrega | 3. Resumen (capa delantera) | 4. Resultado | 5. Stock actualizado |
 |---|---|---|---|---|
-| <img src="docs/screenshots/movil-1-producto.webp" width="170" alt="Pantalla de producto en móvil"> | <img src="docs/screenshots/movil-2-datos.webp" width="170" alt="Modal de tarjeta y entrega en móvil"> | <img src="docs/screenshots/movil-3-resumen.webp" width="170" alt="Resumen del pedido como bottom sheet en móvil"> | <img src="docs/screenshots/movil-4-aprobado.webp" width="170" alt="Pago aprobado en móvil"> | <img src="docs/screenshots/movil-5-stock-actualizado.webp" width="170" alt="Producto con el stock actualizado y resaltado en móvil"> |
+| <img src="docs/screenshots/movil-1-producto.webp" width="170" alt="Pantalla de producto en móvil"> | <img src="docs/screenshots/movil-2-datos.webp" width="170" alt="Modal de tarjeta y entrega en móvil"> | <img src="docs/screenshots/movil-3-resumen.webp" width="170" alt="Resumen con la capa delantera activa: desglose, tarjeta enmascarada y Pagar anclados abajo"> | <img src="docs/screenshots/movil-4-aprobado.webp" width="170" alt="Pago aprobado en móvil"> | <img src="docs/screenshots/movil-5-stock-actualizado.webp" width="170" alt="Producto con el stock actualizado y resaltado en móvil"> |
 
-Pago rechazado: <img src="docs/screenshots/movil-4-rechazado.webp" width="170" alt="Pago rechazado en móvil">
+| 3. Resumen (capa trasera) | Pago rechazado |
+|---|---|
+| <img src="docs/screenshots/movil-3-resumen-trasera.webp" width="170" alt="Resumen con la capa trasera activa: cantidad y Editar datos; la delantera abajo con scrim y total"> | <img src="docs/screenshots/movil-4-rechazado.webp" width="170" alt="Pago rechazado en móvil"> |
 
 ### Desktop (1280×800)
 
 | Producto | Tarjeta y entrega |
 |---|---|
 | <img src="docs/screenshots/desktop-1-producto.webp" alt="Pantalla de producto en desktop"> | <img src="docs/screenshots/desktop-2-datos.webp" alt="Modal de tarjeta y entrega en desktop"> |
-| **Resumen (dos columnas)** | **Resultado** |
-| <img src="docs/screenshots/desktop-3-resumen.webp" alt="Resumen del pedido en dos columnas en desktop"> | <img src="docs/screenshots/desktop-4-aprobado.webp" alt="Pago aprobado en desktop"> |
+| **Resumen: capa delantera** | **Resumen: capa trasera** |
+| <img src="docs/screenshots/desktop-3-resumen.webp" alt="Backdrop en desktop con la capa delantera activa en el contenedor centrado"> | <img src="docs/screenshots/desktop-3-resumen-trasera.webp" alt="Backdrop en desktop con la capa trasera activa"> |
+| **Resultado** | **Stock actualizado** |
+| <img src="docs/screenshots/desktop-4-aprobado.webp" alt="Pago aprobado en desktop"> | <img src="docs/screenshots/desktop-5-stock-actualizado.webp" alt="Producto con el stock actualizado en desktop"> |
 
 ## Arquitectura
 
@@ -331,7 +335,7 @@ Jest en los dos paquetes, con umbral **≥ 80 %** en sentencias, ramas, funcione
 | Paquete | Tests | Sentencias | Ramas | Funciones | Líneas |
 |---|---|---|---|---|---|
 | Backend (`backend/`) | 197 tests · 38 suites | **100 %** (677/677) | **91.84 %** (304/331) | **100 %** (133/133) | **100 %** (593/593) |
-| Frontend (`frontend/`) | 203 tests · 35 suites | **99.54 %** (661/664) | **95.04 %** (307/323) | **99.4 %** (166/167) | **100 %** (563/563) |
+| Frontend (`frontend/`) | 209 tests · 35 suites | **99.56 %** (683/686) | **95.04 %** (326/343) | **99.42 %** (173/174) | **100 %** (579/579) |
 
 ```bash
 cd backend && npm run test:cov
@@ -342,7 +346,7 @@ La CI publica en el *job summary* de cada PR el resumen de cobertura de los dos 
 
 ### Pruebas E2E (Playwright)
 
-El flujo completo se prueba en **Chromium, Firefox y WebKit** (el motor de Safari) a **375×667** (iPhone SE), contra el build de producción del front (`vite build` + `vite preview`). La API se simula dentro del navegador ([`frontend/e2e/mockApi.ts`](frontend/e2e/mockApi.ts)) con estado propio, así que los E2E **no tocan la base de Neon ni la pasarela** y dan siempre el mismo resultado. Spec: [`specs/007-e2e-playwright`](specs/007-e2e-playwright/spec.md).
+El flujo completo se prueba en **Chromium, Firefox y WebKit** (el motor de Safari) a **375×667** (iPhone SE), y el resumen también a 1280×800, contra el build de producción del front (`vite build` + `vite preview`). La API se simula dentro del navegador ([`frontend/e2e/mockApi.ts`](frontend/e2e/mockApi.ts)) con estado propio, así que los E2E **no tocan la base de Neon ni la pasarela** y dan siempre el mismo resultado. Spec: [`specs/007-e2e-playwright`](specs/007-e2e-playwright/spec.md).
 
 | Escenario | Qué comprueba |
 |---|---|
@@ -350,6 +354,9 @@ El flujo completo se prueba en **Chromium, Firefox y WebKit** (el motor de Safar
 | Tarjeta rechazada `4111…` | «Pago rechazado» con el motivo; el stock no cambia |
 | Recarga en el resumen | vuelve al formulario con la entrega conservada y la tarjeta vacía; se reingresa y se paga |
 | Recarga durante el pago | recupera el pago por su `Idempotency-Key`, sin un segundo `POST /transactions` |
+| Backdrop a 375×667 y 1280×800 | delantera anclada abajo a todo el ancho del contenedor, esquinas de 16 px, **Pagar** visible sin scroll, sin diálogo |
+| Cambio de capa | el subencabezado alterna las capas (`aria-expanded`, foco); **Esc** y el scrim suben la delantera; la cantidad recotiza el total |
+| `prefers-reduced-motion` | las capas no se animan |
 
 En todos: sin desbordamiento horizontal, sin errores en la consola y sin el número de tarjeta ni el CVC en `localStorage`.
 
@@ -358,7 +365,7 @@ En todos: sin desbordamiento horizontal, sin errores en la consola y sin el núm
 ```bash
 npm install --prefix frontend      # instala @playwright/test con el resto de dependencias
 npm run e2e:install                # descarga Chromium, Firefox y WebKit (unos cientos de MB, una sola vez; en Linux instala también las librerías del sistema)
-npm run e2e                        # los 3 navegadores, sin ventana (~15 s); construye y levanta el front solo
+npm run e2e                        # 9 tests × 3 navegadores, sin ventana (~20 s); construye y levanta el front solo
 npm run e2e:headed                 # solo Chromium, con ventana y 500 ms entre acciones para verlo en vivo
 E2E_SLOWMO=1000 npm run e2e:headed # más lento todavía
 npm run e2e:ui                     # modo UI de Playwright: elegir tests, ver cada paso, el DOM y la red
@@ -372,7 +379,7 @@ En la CI, el job **`e2e`** corre en paralelo con `verify` en cada PR y push a `d
 
 > Los E2E encontraron un bug que los tests de Jest no veían: Firefox y Safari cortan el `fetch` en vuelo al recargar, el pago se guardaba como fallido y, al volver, la app pedía la tarjeta en vez de recuperar el pago. Ahora también se busca por `Idempotency-Key` en ese caso (AC-005-05).
 
-### Trazabilidad: 86/86 criterios con test
+### Trazabilidad: 91/91 criterios con test
 
 Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un test con ese ID en el nombre (`it('AC-004-12 …')`). [`scripts/trace.ts`](scripts/trace.ts) arma la matriz y falla si falta alguno; la CI la corre con `--shipped`.
 
@@ -386,7 +393,8 @@ Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un 
 | [006 · despliegue](specs/006-despliegue/spec.md) | Lambda + HTTP API, S3 + CloudFront (OAC), HTTPS, headers, CORS | 10 | ✅ 10 |
 | [007 · E2E con Playwright](specs/007-e2e-playwright/spec.md) | flujo completo en Chromium, Firefox y WebKit con la API simulada, job `e2e` en la CI | 6 | ✅ 6 |
 | [008 · headers de seguridad](specs/008-headers-seguridad/spec.md) | COOP, CORP y Permissions-Policy en CloudFront tras el HTTP Observatory | 3 | ✅ 3 |
-| **Total** | | **86** | **✅ 86/86** |
+| [009 · backdrop del resumen](specs/009-backdrop-resumen/spec.md) | paso Resumen con el patrón Backdrop de Material, accesibilidad y reduced motion | 5 | ✅ 5 |
+| **Total** | | **91** | **✅ 91/91** |
 
 ```bash
 npx tsx scripts/trace.ts             # matriz completa (todas las specs)
@@ -422,13 +430,13 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 | AC-003-01 | backend/src/application/quote/quote-checkout.use-case.spec.ts<br>backend/src/domain/quote/quote.spec.ts<br>backend/src/infrastructure/config/config-fees.provider.spec.ts<br>backend/src/infrastructure/http/products.controller.spec.ts | ✅ |
 | AC-003-02 | backend/src/application/quote/quote-checkout.use-case.spec.ts<br>backend/src/domain/quote/quote.spec.ts<br>backend/src/infrastructure/http/products.controller.spec.ts | ✅ |
 | AC-003-03 | backend/src/application/quote/quote-checkout.use-case.spec.ts<br>backend/src/domain/quote/quote.spec.ts<br>backend/src/infrastructure/http/products.controller.spec.ts | ✅ |
-| AC-003-04 | frontend/src/features/payment/SummarySheet.test.tsx<br>frontend/src/features/payment/quoteSlice.test.ts | ✅ |
-| AC-003-05 | frontend/src/features/payment/SummarySheet.test.tsx | ✅ |
+| AC-003-04 | frontend/src/features/payment/SummaryBackdrop.test.tsx<br>frontend/src/features/payment/quoteSlice.test.ts | ✅ |
+| AC-003-05 | frontend/src/features/payment/SummaryBackdrop.test.tsx | ✅ |
 | AC-003-06 | frontend/src/features/payment/QuantityStepper.test.tsx | ✅ |
 | AC-003-07 | frontend/src/features/payment/PayButton.test.tsx | ✅ |
 | AC-003-08 | frontend/src/features/payment/PayButton.test.tsx | ✅ |
-| AC-003-09 | frontend/src/features/payment/SummarySheet.test.tsx<br>frontend/src/features/payment/quoteSlice.test.ts | ✅ |
-| AC-003-10 | frontend/src/features/payment/SummarySheet.test.tsx | ✅ |
+| AC-003-09 | frontend/src/features/payment/SummaryBackdrop.test.tsx<br>frontend/src/features/payment/quoteSlice.test.ts | ✅ |
+| AC-003-10 | frontend/src/features/payment/SummaryBackdrop.test.tsx | ✅ |
 | AC-004-01 | backend/src/application/customers/create-customer.use-case.spec.ts<br>backend/src/infrastructure/http/customers.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-customer.repository.spec.ts | ✅ |
 | AC-004-02 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts | ✅ |
 | AC-004-03 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/http/transactions.controller.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
@@ -484,6 +492,11 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 | AC-008-01 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
 | AC-008-02 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
 | AC-008-03 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-009-01 | frontend/src/features/payment/SummaryBackdrop.test.tsx | ✅ |
+| AC-009-02 | frontend/e2e/backdrop.spec.ts<br>frontend/src/features/payment/SummaryBackdrop.test.tsx | ✅ |
+| AC-009-03 | frontend/e2e/backdrop.spec.ts<br>frontend/src/features/payment/SummaryBackdrop.test.tsx | ✅ |
+| AC-009-04 | frontend/e2e/backdrop.spec.ts | ✅ |
+| AC-009-05 | frontend/e2e/backdrop.spec.ts | ✅ |
 
 </details>
 

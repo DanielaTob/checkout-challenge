@@ -95,7 +95,8 @@ jobs:
         run: npx tsx scripts/trace.ts --shipped --out trace.md
       - name: Traceability summary
         if: always()
-        run: { echo "## Trazabilidad"; cat trace.md 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          { echo "## Trazabilidad"; cat trace.md 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
 
   build:
     needs: [test-backend, test-frontend]

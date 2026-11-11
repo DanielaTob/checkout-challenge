@@ -14,7 +14,8 @@ Checkout móvil de un producto pagado con tarjeta de crédito a través de una p
 - **Backend**: NestJS + TypeScript, arquitectura hexagonal (puertos y adaptadores) y Railway Oriented Programming.
 - **Base de datos**: PostgreSQL serverless (Neon) con Prisma, conexión SSL.
 - **Nube (AWS)**: front en S3 privado + CloudFront (OAC, HTTPS); back en Lambda (fuera de la VPC) + API Gateway HTTP API. Infraestructura en CloudFormation ([`infra/template.yaml`](infra/template.yaml)).
-- **Seguridad**: HTTPS en ambos extremos; CloudFront agrega HSTS (`max-age=63072000; preload`), CSP `default-src 'self'`, `X-Frame-Options: DENY` y `nosniff`; la API usa `helmet`, CORS restringido al dominio del front y validación estricta de DTOs (`whitelist` + `forbidNonWhitelisted`). La tarjeta se tokeniza en la pasarela: el número y el CVC nunca se guardan, ni se loguean, ni llegan a `localStorage` (hay tests que lo prueban).
+- **Seguridad**: HTTPS en ambos extremos; CloudFront agrega HSTS (`max-age=63072000; preload`), CSP `default-src 'self'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Cross-Origin-Opener-Policy` y `Cross-Origin-Resource-Policy` (`same-origin`) y una `Permissions-Policy` que apaga cámara, micrófono, geolocalización, USB y Payment Request; la API usa `helmet`, CORS restringido al dominio del front y validación estricta de DTOs (`whitelist` + `forbidNonWhitelisted`). La tarjeta se tokeniza en la pasarela: el número y el CVC nunca se guardan, ni se loguean, ni llegan a `localStorage` (hay tests que lo prueban).
+- **[HTTP Observatory de MDN](https://developer.mozilla.org/en-US/observatory/analyze?host=d3uvn5ovkcpvxw.cloudfront.net)** (escaneo del front del **2026-11-11**): **A+ · 115/100 · 12/12 tests superados**. El informe marcaba COOP, CORP y COEP como no implementados (sin penalización): v1.0.1 agrega COOP, CORP y `Permissions-Policy` ([spec 008](specs/008-headers-seguridad/spec.md)). COEP (`require-corp`) se deja fuera a propósito: solo sirve para aislar el origen (`SharedArrayBuffer`), que la app no usa.
 
 **Tarjetas del sandbox**: `4242 4242 4242 4242` → aprobada · `4111 1111 1111 1111` → rechazada (cualquier CVC de 3 dígitos y fecha futura).
 
@@ -329,7 +330,7 @@ Jest en los dos paquetes, con umbral **≥ 80 %** en sentencias, ramas, funcione
 
 | Paquete | Tests | Sentencias | Ramas | Funciones | Líneas |
 |---|---|---|---|---|---|
-| Backend (`backend/`) | 194 tests · 38 suites | **100 %** (677/677) | **91.84 %** (304/331) | **100 %** (133/133) | **100 %** (593/593) |
+| Backend (`backend/`) | 197 tests · 38 suites | **100 %** (677/677) | **91.84 %** (304/331) | **100 %** (133/133) | **100 %** (593/593) |
 | Frontend (`frontend/`) | 203 tests · 35 suites | **99.54 %** (661/664) | **95.04 %** (307/323) | **99.4 %** (166/167) | **100 %** (563/563) |
 
 ```bash
@@ -371,7 +372,7 @@ En la CI, el job **`e2e`** corre en paralelo con `verify` en cada PR y push a `d
 
 > Los E2E encontraron un bug que los tests de Jest no veían: Firefox y Safari cortan el `fetch` en vuelo al recargar, el pago se guardaba como fallido y, al volver, la app pedía la tarjeta en vez de recuperar el pago. Ahora también se busca por `Idempotency-Key` en ese caso (AC-005-05).
 
-### Trazabilidad: 83/83 criterios con test
+### Trazabilidad: 86/86 criterios con test
 
 Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un test con ese ID en el nombre (`it('AC-004-12 …')`). [`scripts/trace.ts`](scripts/trace.ts) arma la matriz y falla si falta alguno; la CI la corre con `--shipped`.
 
@@ -384,7 +385,8 @@ Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un 
 | [005 · resiliencia](specs/005-resiliencia/spec.md) | recuperar el paso tras recargar, idempotencia, timeouts | 15 | ✅ 15 |
 | [006 · despliegue](specs/006-despliegue/spec.md) | Lambda + HTTP API, S3 + CloudFront (OAC), HTTPS, headers, CORS | 10 | ✅ 10 |
 | [007 · E2E con Playwright](specs/007-e2e-playwright/spec.md) | flujo completo en Chromium, Firefox y WebKit con la API simulada, job `e2e` en la CI | 6 | ✅ 6 |
-| **Total** | | **83** | **✅ 83/83** |
+| [008 · headers de seguridad](specs/008-headers-seguridad/spec.md) | COOP, CORP y Permissions-Policy en CloudFront tras el HTTP Observatory | 3 | ✅ 3 |
+| **Total** | | **86** | **✅ 86/86** |
 
 ```bash
 npx tsx scripts/trace.ts             # matriz completa (todas las specs)
@@ -479,6 +481,9 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 | AC-007-04 | frontend/e2e/checkout.spec.ts | ✅ |
 | AC-007-05 | frontend/e2e/checkout.spec.ts | ✅ |
 | AC-007-06 | frontend/src/test/e2eSetup.test.ts | ✅ |
+| AC-008-01 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-008-02 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-008-03 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
 
 </details>
 

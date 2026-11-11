@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CD identity for checkout-challenge (deployed once by hand, us-east-2; see docs/adr/0005).
+  The account SCP denies iam:CreateOpenIDConnectProvider, so GitHub Actions cannot use OIDC:
+  a dedicated IAM user (access keys created by hand in the console, stored only as secrets of
+  the GitHub `production` environment) with least privilege. The user can only run change sets
+  on the app stack (passing the CloudFormation execution role), upload the Lambda artifact and
+  the SPA, and invalidate CloudFront; the execution role, scoped to the project's resources,
+  is what creates and updates Lambda, API Gateway, logs, dashboards and alarms.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: checkout-challenge
+
+Resources:
+  # Used by .github/workflows/deploy.yml through AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+  CiDeployerUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: checkout-ci-deployer
+      ManagedPolicyArns: [!Ref CiDeployerPolicy]
+
+  CiDeployerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${ProjectName}-ci-deployer'
+      Description: Least privilege for scripts/deploy.sh in GitHub Actions
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AppStackChangeSets
+            Effect: Allow
+            Action:
+              - cloudformation:CreateChangeSet
+              - cloudformation:DescribeChangeSet
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:DeleteChangeSet
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackEvents
+              - cloudformation:GetTemplateSummary
+            Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}/*'
+          - Sid: ValidateTemplate
+            Effect: Allow
+            Action: cloudformation:ValidateTemplate
+            Resource: '*'
+          - Sid: PassOnlyTheExecutionRole
+            Effect: Allow
+            Action: iam:PassRole
+            Resource: !GetAtt CloudFormationExecutionRole.Arn
+            Condition:
+              StringEquals: { iam:PassedToService: cloudformation.amazonaws.com }
+          - Sid: Buckets
+            Effect: Allow
+            Action: [s3:ListBucket, s3:GetBucketLocation]
+            Resource:
+              - !Sub 'arn:aws:s3:::${ProjectName}-artifacts-${AWS::AccountId}-${AWS::Region}'
+              - !Sub 'arn:aws:s3:::${ProjectName}-web-${AWS::AccountId}'
+          - Sid: Objects
+            Effect: Allow
+            Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+            Resource:
+              - !Sub 'arn:aws:s3:::${ProjectName}-artifacts-${AWS::AccountId}-${AWS::Region}/*'
+              - !Sub 'arn:aws:s3:::${ProjectName}-web-${AWS::AccountId}/*'
+          - Sid: InvalidateSpa
+            Effect: Allow
+            Action: [cloudfront:CreateInvalidation, cloudfront:GetInvalidation]
+            Resource: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/*'
+          - Sid: NoKeySelfService # keys are created and rotated by a person in the console
+            Effect: Deny
+            Action:
+              - iam:CreateAccessKey
+              - iam:UpdateAccessKey
+              - iam:DeleteAccessKey
+              - iam:CreateLoginProfile
+              - iam:AttachUserPolicy
+              - iam:PutUserPolicy
+            Resource: '*'
+
+  # Used by CloudFormation (passed with --role-arn) to create/update/rollback the app stack.
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-cfn-exec'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudformation.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: app-stack
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: Lambda
+                Effect: Allow
+                Action: lambda:*
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
+              - Sid: HttpApi
+                Effect: Allow
+                Action: apigateway:*
+                Resource:
+                  - !Sub 'arn:aws:apigateway:${AWS::Region}::/apis'
+                  - !Sub 'arn:aws:apigateway:${AWS::Region}::/apis/*'
+                  - !Sub 'arn:aws:apigateway:${AWS::Region}::/tags/*'
+              - Sid: FunctionRole
+                Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:UpdateRole
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PassRole
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'
+              - Sid: FunctionRoleManagedPolicies # only the two AWS policies the Lambda role uses
+                Effect: Allow
+                Action: iam:AttachRolePolicy
+                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'
+                Condition:
+                  ArnEquals:
+                    iam:PolicyARN:
+                      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+                      - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+              - Sid: NeverTouchTheCdIdentities # cannot widen itself or the CI user
+                Effect: Deny
+                Action: iam:*
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-cfn-exec'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:user/checkout-ci-deployer'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:policy/${ProjectName}-ci-deployer'
+              - Sid: Buckets
+                Effect: Allow
+                Action: s3:*
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ProjectName}-*'
+                  - !Sub 'arn:aws:s3:::${ProjectName}-*/*'
+              - Sid: CloudFront
+                Effect: Allow
+                Action:
+                  - cloudfront:Get*
+                  - cloudfront:List*
+                  - cloudfront:CreateDistribution
+                  - cloudfront:CreateDistributionWithTags
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:DeleteDistribution
+                  - cloudfront:TagResource
+                  - cloudfront:UntagResource
+                  - cloudfront:CreateOriginAccessControl
+                  - cloudfront:UpdateOriginAccessControl
+                  - cloudfront:DeleteOriginAccessControl
+                  - cloudfront:CreateResponseHeadersPolicy
+                  - cloudfront:UpdateResponseHeadersPolicy
+                  - cloudfront:DeleteResponseHeadersPolicy
+                Resource: '*'
+              - Sid: Logs
+                Effect: Allow
+                Action: logs:*
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-*'
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-*:*'
+              - Sid: LogsAccountLevel # DescribeLogGroups has no resource scoping
+                Effect: Allow
+                Action: logs:DescribeLogGroups
+                Resource: '*'
+              - Sid: DashboardsAndAlarms
+                Effect: Allow
+                Action:
+                  - cloudwatch:PutDashboard
+                  - cloudwatch:GetDashboard
+                  - cloudwatch:DeleteDashboards
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:TagResource
+                  - cloudwatch:UntagResource
+                  - cloudwatch:ListTagsForResource
+                Resource: '*'
+
+Outputs:
+  CiDeployerUserName:
+    Value: !Ref CiDeployerUser
+  CloudFormationExecutionRoleArn:
+    Value: !GetAtt CloudFormationExecutionRole.Arn

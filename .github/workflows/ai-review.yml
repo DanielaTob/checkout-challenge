@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@4fa93a88de49bbef68b10eb15aabedf28ca0e1ed # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Use the workflow token (comments come from github-actions[bot]), so no OIDC
@@ -40,6 +40,7 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
             BASE: ${{ github.event.pull_request.base.ref }}
+            HEAD SHA: ${{ github.event.pull_request.head.sha }}
 
             Eres revisor de código de este repositorio. Escribe en español.
 
@@ -61,7 +62,8 @@ jobs:
                `mcp__github_inline_comment__create_inline_comment` (con `confirmed: true`),
                indicando severidad (bloqueante / sugerencia) y una propuesta de arreglo.
                No comentes estilo que el linter ya cubre ni repitas comentarios.
-            4. Termina con UN comentario de resumen (`gh pr comment`) con: veredicto
+            4. Termina con UN comentario de resumen (`gh pr comment`) que empiece por
+               `Revisión de IA @ <HEAD SHA corto>` (el último resumen es el vigente) con: veredicto
                (aprobar / cambios requeridos), lista de hallazgos y qué revisaste.
 
             Reglas: no escribas nunca el nombre comercial de la pasarela (usa "payment

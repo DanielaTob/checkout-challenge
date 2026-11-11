@@ -20,3 +20,6 @@ lambda.zip
 .vscode/
 backend/src/generated/
 .build/
+
+# git worktrees (parallel agents / branches checked out side by side)
+.worktrees/

@@ -11,7 +11,12 @@
     "typecheck": "tsc -b --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "e2e": "playwright test",
+    "e2e:headed": "E2E_SLOWMO=${E2E_SLOWMO:-500} playwright test --project=chromium --headed --workers=1",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report",
+    "e2e:install": "playwright install --with-deps chromium firefox webkit"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.14.0",
@@ -21,6 +26,7 @@
     "redux-persist": "^6.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.9",
@@ -38,7 +44,8 @@
     "vite": "^8.3.6"
   },
   "allowScripts": {
-    "@parcel/watcher": false
+    "@parcel/watcher": false,
+    "fsevents": false
   },
   "overrides": {
     "glob": "^14.0.4",

@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { headphones, quoteFor, summaryCheckout } from '../../test/fixtures';
 import { renderWithStore } from '../../test/renderWithStore';
-import { SummarySheet } from './SummarySheet';
+import { SummaryBackdrop } from './SummaryBackdrop';
 
 jest.mock('../../shared/api/http', () => ({
   ...jest.requireActual<typeof import('../../shared/api/http')>('../../shared/api/http'),
@@ -13,11 +13,15 @@ const { getJson, postJson } = jest.requireMock<{ getJson: jest.Mock; postJson: j
 
 const card = { number: '4242424242424242', expiry: '08/29', cvc: '123', holderName: 'Jose Perez' };
 const setup = () =>
-  renderWithStore(<SummarySheet />, {
+  renderWithStore(<SummaryBackdrop />, {
     checkout: summaryCheckout(),
     cardSession: card,
     products: { items: [headphones], status: 'succeeded', error: null },
   });
+
+/** The quantity selector and "Editar datos" live in the back layer (spec 009): reveal it first. */
+const revealBackLayer = async () =>
+  userEvent.click(await screen.findByRole('button', { name: /Resumen del pedido/, expanded: true }));
 
 describe('Pagar / Editar datos', () => {
   beforeEach(() => {
@@ -67,7 +71,8 @@ describe('Pagar / Editar datos', () => {
 
   it('AC-003-08 Editar datos goes back to the modal step keeping the delivery data', async () => {
     const { store } = setup();
-    await userEvent.click(await screen.findByRole('button', { name: 'Editar datos' }));
+    await revealBackLayer();
+    await userEvent.click(screen.getByRole('button', { name: 'Editar datos' }));
     expect(store.getState().checkout.step).toBe('details');
     expect(store.getState().checkout.delivery.fullName).toBe('José Pérez');
   });
@@ -82,7 +87,8 @@ describe('Editar datos keeps the card typed in this session', () => {
       cardSession: card,
       products: { items: [headphones], status: 'succeeded', error: null },
     });
-    await userEvent.click(await screen.findByRole('button', { name: 'Editar datos' }));
+    await revealBackLayer();
+    await userEvent.click(screen.getByRole('button', { name: 'Editar datos' }));
     expect(screen.getByLabelText('Número de tarjeta')).toHaveValue('4242 4242 4242 4242');
     expect(screen.getByLabelText('Nombre completo')).toHaveValue('José Pérez');
   });

@@ -10,7 +10,7 @@
 | [006-despliegue](006-despliegue/spec.md) | AWS (Lambda + HTTP API, S3 + CloudFront), HTTPS y headers | Implementada |
 | [007-e2e-playwright](007-e2e-playwright/spec.md) | E2E del flujo completo en Chromium, Firefox y WebKit (API simulada) | Implementada |
 | [008-headers-seguridad](008-headers-seguridad/spec.md) | COOP, CORP y Permissions-Policy en CloudFront tras el HTTP Observatory | Implementada |
-| [009-backdrop-resumen](009-backdrop-resumen/spec.md) | Paso Resumen con el patrón Backdrop de Material (móvil y desktop) | En curso |
+| [009-backdrop-resumen](009-backdrop-resumen/spec.md) | Paso Resumen con el patrón Backdrop de Material (móvil y desktop) | Implementada |
 
 ## Contrato de API (visión global)
 

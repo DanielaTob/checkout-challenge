@@ -5,17 +5,23 @@ export const VISA_APPROVED = '4242424242424242';
 export const VISA_DECLINED = '4111111111111111';
 const CVC = '123';
 
-/** Every test gets a fresh mocked API and fails on console errors or uncaught exceptions (AC-007-05). */
+/**
+ * Every test gets a fresh mocked API (auto: even if it doesn't ask for `api`) and fails on
+ * console errors or uncaught exceptions (AC-007-05).
+ */
 export const test = base.extend<{ api: MockApi }>({
-  api: async ({ page }, use) => {
-    const errors: string[] = [];
-    page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-    page.on('console', (m) => {
-      if (m.type() === 'error') errors.push(`console: ${m.text()}`);
-    });
-    await use(await mockApi(page));
-    expect(errors, 'no console errors').toEqual([]);
-  },
+  api: [
+    async ({ page }, use) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+      page.on('console', (m) => {
+        if (m.type() === 'error') errors.push(`console: ${m.text()}`);
+      });
+      await use(await mockApi(page));
+      expect(errors, 'no console errors').toEqual([]);
+    },
+    { auto: true },
+  ],
 });
 export { expect };
 

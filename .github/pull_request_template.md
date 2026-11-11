@@ -22,6 +22,7 @@ Spec: `specs/NNN-nombre/spec.md`
 - [ ] Sin el nombre comercial de la pasarela
 - [ ] Commits convencionales
 - [ ] Tareas marcadas en `tasks.md`
+- [ ] Revisión de la IA recibida y todos sus comentarios atendidos o respondidos
 
 ## Salida de verify
 

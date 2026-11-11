@@ -1,0 +1,68 @@
+name: AI review
+
+# Automated code review of every PR to develop/main with the official Claude Code Action.
+# Reviews the diff against AGENTS.md and the spec linked in the PR body, posts inline
+# comments on specific lines and one summary comment. Only open PRs are reviewed.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [develop, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Use the workflow token (comments come from github-actions[bot]).
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            BASE: ${{ github.event.pull_request.base.ref }}
+
+            Eres revisor de código de este repositorio. Escribe en español.
+
+            1. Lee `AGENTS.md` (constitución del proyecto) y la descripción del PR
+               (`gh pr view ${{ github.event.pull_request.number }}`). Si enlaza una spec
+               (`specs/NNN-nombre/spec.md`), léela junto con su `plan.md` y `tasks.md`.
+            2. Revisa el diff (`gh pr diff ${{ github.event.pull_request.number }}`) contra:
+               - Arquitectura hexagonal: controlador → caso de uso → puertos; el dominio
+                 no importa NestJS ni Prisma; nada de lógica de negocio en controladores.
+               - ROP: los casos de uso devuelven `Result<T, DomainError>` y no lanzan por
+                 errores de negocio; el controlador traduce a HTTP con los códigos de AGENTS.md.
+               - Seguridad de la tarjeta: número completo y CVC nunca se guardan, loguean
+                 ni persisten (tampoco en localStorage); solo marca y últimos 4 dígitos.
+                 Secretos solo en variables de entorno.
+               - Tests y trazabilidad: cada AC `AC-NNN-YY` de la spec tiene un test con ese
+                 ID; no se debilitan tests ni umbrales de cobertura.
+               - Bugs, condiciones de carrera (stock, idempotencia), errores de CI/infra.
+            3. Para cada problema concreto deja un comentario en línea con
+               `mcp__github_inline_comment__create_inline_comment` (con `confirmed: true`),
+               indicando severidad (bloqueante / sugerencia) y una propuesta de arreglo.
+               No comentes estilo que el linter ya cubre ni repitas comentarios.
+            4. Termina con UN comentario de resumen (`gh pr comment`) con: veredicto
+               (aprobar / cambios requeridos), lista de hallazgos y qué revisaste.
+
+            Reglas: no escribas nunca el nombre comercial de la pasarela (usa "payment
+            gateway"), ni valores de secretos, tokens o números de tarjeta completos.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"

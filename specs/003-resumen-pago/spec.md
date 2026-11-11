@@ -25,7 +25,7 @@ Mostrar en un backdrop (estilo Material, pantalla 3) el desglose del pago calcul
 - **AC-003-07** — Dado que toco **Pagar**, cuando la petición está en curso, entonces el botón queda deshabilitado con un indicador de carga, y tocarlo varias veces envía una sola petición.
 - **AC-003-08** — Dado el resumen, cuando toco **Editar datos**, entonces vuelvo al modal con los datos de entrega cargados.
 - **AC-003-09** — Dado que la cotización responde `409`, cuando se muestra, entonces veo "Ya no hay stock suficiente" y **Pagar** queda deshabilitado.
-- **AC-003-10** — Dado el backdrop, cuando se muestra a 375×667, entonces ocupa la parte inferior con esquinas redondeadas, fondo atenuado detrás, `role="dialog"`, y el botón **Pagar** queda visible sin scroll horizontal.
+- **AC-003-10** — Dado el backdrop, cuando se muestra a 375×667, entonces sigue el patrón Backdrop de Material (capa trasera con los controles y capa delantera anclada abajo con esquinas superiores redondeadas; detalle en la spec 009), y el botón **Pagar** queda visible sin scroll horizontal. *(Hasta v1.0.1 era una hoja modal con `role="dialog"` sobre un fondo atenuado.)*
 
 ## Casos borde
 - La cotización falla por red → mensaje con **Reintentar**; Pagar deshabilitado.

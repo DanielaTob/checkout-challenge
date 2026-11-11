@@ -5,7 +5,12 @@
   "scripts": {
     "prepare": "husky",
     "verify": "scripts/verify.sh",
-    "trace": "tsx scripts/trace.ts"
+    "trace": "tsx scripts/trace.ts",
+    "e2e": "npm --prefix frontend run e2e --",
+    "e2e:headed": "npm --prefix frontend run e2e:headed --",
+    "e2e:ui": "npm --prefix frontend run e2e:ui --",
+    "e2e:report": "npm --prefix frontend run e2e:report --",
+    "e2e:install": "npm --prefix frontend run e2e:install --"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Deploys the whole stack (API on Lambda + SPA on S3/CloudFront) with CloudFormation.
 #   scripts/deploy.sh            build, deploy infra, migrate + seed, upload SPA, smoke test
-# Requirements: AWS credentials (`aws configure` locally; OIDC role in .github/workflows/deploy.yml)
+# Requirements: AWS credentials (`aws configure` locally; user checkout-ci-deployer in CI)
 # and the backend variables, from backend/.env.production (never committed) or, in CI, from the
 # environment (GitHub `production` environment secrets).
-# Optional: CFN_EXEC_ROLE_ARN (CloudFormation service role from infra/github-oidc.yaml).
+# Optional: CFN_EXEC_ROLE_ARN (CloudFormation service role from infra/ci-deployer.yaml).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"

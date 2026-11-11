@@ -2,15 +2,16 @@ name: Deploy
 
 # CD to production. Called by CI (.github/workflows/ci.yml, job `deploy`) after every push to
 # `main` once all CI stages are green; can also be run by hand on `main` (workflow_dispatch).
-# AWS access through OIDC: assumes the role from infra/github-oidc.yaml, no AWS keys in GitHub.
-# The `production` environment only allows `main` and holds the backend secrets.
+# AWS access: the dedicated IAM user `checkout-ci-deployer` (infra/ci-deployer.yaml, least
+# privilege). OIDC was the first choice but the account SCP denies creating the OIDC provider
+# (docs/adr/0005). Its access keys and the backend config live only as secrets of the
+# `production` environment, which only allows `main`.
 on:
   workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: deploy-production
@@ -33,11 +34,11 @@ jobs:
       - uses: ./.github/actions/setup
         with: { packages: backend frontend }
 
-      - name: Assume the deploy role (OIDC)
+      - name: AWS credentials (checkout-ci-deployer)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          role-session-name: gh-deploy-${{ github.run_id }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
 
       - name: Deploy (scripts/deploy.sh)

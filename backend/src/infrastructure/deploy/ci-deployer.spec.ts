@@ -71,6 +71,19 @@ describe('infra/ci-deployer.yaml', () => {
     );
   });
 
+  it('never takes CORS_ORIGINS from GitHub: production CORS comes from the CloudFront domain in the template', () => {
+    const workflow = readFileSync(
+      join(__dirname, '../../../../.github/workflows/deploy.yml'),
+      'utf8',
+    );
+    const deployScript = readFileSync(
+      join(__dirname, '../../../../scripts/deploy.sh'),
+      'utf8',
+    );
+    expect(workflow).not.toContain('CORS_ORIGINS');
+    expect(deployScript).not.toMatch(/CorsOrigins|CORS_ORIGINS=/);
+  });
+
   it('has no OIDC provider (denied by the account SCP, ADR 0005)', () => {
     expect(template).not.toContain('AWS::IAM::OIDCProvider');
   });

@@ -36,6 +36,23 @@ Plan B: un **usuario IAM dedicado**, `checkout-ci-deployer`, definido en `infra/
 | La llave envejece | **Rotación cada 90 días** o ante cualquier sospecha. Se crea la llave nueva, se actualizan los dos secretos, se lanza `Deploy` a mano (`workflow_dispatch` en `main`), se desactiva la anterior y después se borra. IAM permite dos llaves activas, así que la rotación no corta el CD. |
 | Uso no detectado | CloudTrail registra cada llamada del usuario, y "Último uso" en IAM muestra si la llave se usa fuera de las ventanas de despliegue. |
 
+## Riesgo residual aceptado
+
+El rol de ejecución puede crear roles `checkout-challenge-*` con políticas inline. Quien tenga las
+llaves podría pasarle a CloudFormation una plantilla que cree un rol `checkout-challenge-x` con
+`*:*`. No se añade un *permissions boundary* porque:
+
+- Las llaves solo existen en el environment `production` (solo `main`, protegida). Quien puede
+  usarlas ya controla `infra/template.yaml` y puede desplegar lo que quiera por la vía normal.
+- El `Deny` impide que el rol se amplíe a sí mismo, al usuario o a su política. Las políticas
+  gestionadas adjuntables son una lista cerrada.
+- Añadir el boundary obliga a migrar el rol existente de la Lambda
+  (`PutRolePermissionsBoundary`) en el mismo despliegue que estrena el CD.
+
+Si el repo pasa a tener más personas con acceso a `main`, este es el siguiente endurecimiento:
+una política `checkout-challenge-boundary` y la condición `iam:PermissionsBoundary` en
+`CreateRole`, `PutRolePolicy` y `AttachRolePolicy`.
+
 ## Consecuencias
 
 - Si en el futuro el SCP permite OIDC, se vuelve al ADR 0004: se crea el proveedor y el rol, se

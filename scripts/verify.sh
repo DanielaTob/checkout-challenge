@@ -71,7 +71,12 @@ section() {
   esac
 }
 
+SECTIONS=" lint typecheck test-backend test-frontend build security audit secrets forbidden "
 if [[ $# -gt 0 ]]; then
+  # Validate every argument before running anything.
+  for s in "$@"; do
+    [[ "$SECTIONS" == *" $s "* ]] || { echo "Unknown section: $s (${SECTIONS# })"; exit 2; }
+  done
   for s in "$@"; do section "$s"; done
 else
   section lint

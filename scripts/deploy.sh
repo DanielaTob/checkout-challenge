@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Deploys the whole stack (API on Lambda + SPA on S3/CloudFront) with CloudFormation.
 #   scripts/deploy.sh            build, deploy infra, migrate + seed, upload SPA, smoke test
-# Requirements: `aws configure` done, backend/.env.production present (never committed).
+# Requirements: AWS credentials (`aws configure` locally; OIDC role in .github/workflows/deploy.yml)
+# and the backend variables, from backend/.env.production (never committed) or, in CI, from the
+# environment (GitHub `production` environment secrets).
+# Optional: CFN_EXEC_ROLE_ARN (CloudFormation service role from infra/github-oidc.yaml).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -10,14 +13,19 @@ REGION="${AWS_REGION:-us-east-2}"
 ENV_FILE="backend/.env.production"
 export AWS_REGION="$REGION" AWS_PAGER=""
 
-[[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE"; exit 1; }
-# Load with the dotenv parser (values may contain & or ?), never echo them.
-eval "$(cd backend && node -e '
+if [[ -f "$ENV_FILE" ]]; then
+  # Load with the dotenv parser (values may contain & or ?), never echo them.
+  eval "$(cd backend && node -e '
 const p=require("dotenv").parse(require("fs").readFileSync(".env.production"));
 const q=s=>"\x27"+String(s).replace(/\x27/g,"\x27\\\x27\x27")+"\x27";
 for (const [k,v] of Object.entries(p)) console.log("export "+k+"="+q(v));')"
+else
+  echo "▶ $ENV_FILE not found: using variables from the environment"
+fi
+# An empty optional secret must not shadow DATABASE_URL in prisma.config.ts (`??`).
+[[ -n "${DIRECT_DATABASE_URL:-}" ]] || unset DIRECT_DATABASE_URL
 for v in DATABASE_URL GATEWAY_BASE_URL GATEWAY_PUBLIC_KEY GATEWAY_PRIVATE_KEY GATEWAY_INTEGRITY_SECRET GATEWAY_EVENTS_SECRET BASE_FEE_IN_CENTS DELIVERY_FEE_IN_CENTS; do
-  [[ -n "${!v:-}" ]] || { echo "Missing $v in $ENV_FILE"; exit 1; }
+  [[ -n "${!v:-}" ]] || { echo "Missing $v ($ENV_FILE or environment)"; exit 1; }
 done
 
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
@@ -37,8 +45,10 @@ scripts/build-lambda.sh
 echo "▶ cloudformation package + deploy"
 aws cloudformation package --template-file infra/template.yaml --s3-bucket "$ARTIFACTS" \
   --s3-prefix backend --output-template-file .build/packaged.yaml >/dev/null
+ROLE_ARGS=()
+[[ -n "${CFN_EXEC_ROLE_ARN:-}" ]] && ROLE_ARGS=(--role-arn "$CFN_EXEC_ROLE_ARN")
 aws cloudformation deploy --stack-name "$STACK" --template-file .build/packaged.yaml \
-  --capabilities CAPABILITY_IAM --no-fail-on-empty-changeset \
+  --capabilities CAPABILITY_IAM --no-fail-on-empty-changeset ${ROLE_ARGS[@]+"${ROLE_ARGS[@]}"} \
   --parameter-overrides \
     "DatabaseUrl=$DATABASE_URL" "GatewayBaseUrl=$GATEWAY_BASE_URL" "GatewayPublicKey=$GATEWAY_PUBLIC_KEY" \
     "GatewayPrivateKey=$GATEWAY_PRIVATE_KEY" "GatewayIntegritySecret=$GATEWAY_INTEGRITY_SECRET" \
@@ -56,11 +66,14 @@ VITE_API_URL="$API_URL" npm --prefix frontend run --silent build >/dev/null
 aws s3 sync frontend/dist "s3://$BUCKET" --delete --exclude index.html \
   --cache-control "public,max-age=31536000,immutable" >/dev/null
 aws s3 cp frontend/dist/index.html "s3://$BUCKET/index.html" --cache-control "no-cache" >/dev/null
-aws cloudfront create-invalidation --distribution-id "$DIST" --paths /index.html >/dev/null
+INVALIDATION="$(aws cloudfront create-invalidation --distribution-id "$DIST" --paths /index.html --query Invalidation.Id --output text)"
+aws cloudfront wait invalidation-completed --distribution-id "$DIST" --id "$INVALIDATION"
 
-echo "▶ smoke test"
-curl -fsS --max-time 30 "$API_URL/health" && echo
-curl -fsS -o /dev/null -w "  SPA HTTP %{http_code}\n" --max-time 30 "$WEB_URL"
+# The deploy workflow runs the smoke test as its own step (SMOKE_TEST=0 here).
+[[ "${SMOKE_TEST:-1}" == "0" ]] || scripts/smoke-test.sh "$API_URL" "$WEB_URL"
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  { echo "api_url=$API_URL"; echo "web_url=$WEB_URL"; } >> "$GITHUB_OUTPUT"
+fi
 
 cat <<SUMMARY
 

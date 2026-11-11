@@ -1,5 +1,12 @@
 name: CI
 
+# Staged pipeline. Every quality job calls one section of scripts/verify.sh, so the checks
+# are defined once and shared with Husky (VERIFY_FAST=1) and the `ship` skill.
+#
+#   lint ─┐                                 ┌─ test-backend ─┐
+#         ├─────────────────────────────────┤                ├─ build ─ e2e
+#   typecheck ┘                             └─ test-frontend ┘
+#   security (gitleaks · forbidden word · npm audit)      trace (AC → tests)
 on:
   pull_request:
     branches: [develop, main]
@@ -14,7 +21,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with: { packages: backend frontend }
+      - run: scripts/verify.sh lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with: { packages: backend frontend }
+      - run: scripts/verify.sh typecheck
+
+  test-backend:
+    needs: [lint, typecheck]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with: { packages: backend }
+      - run: scripts/verify.sh test-backend
+      - name: Coverage summary
+        if: always()
+        run: scripts/ci-coverage-summary.sh backend >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: coverage-backend, path: backend/coverage/, retention-days: 7, if-no-files-found: ignore }
+
+  test-frontend:
+    needs: [lint, typecheck]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with: { packages: frontend }
+      - run: scripts/verify.sh test-frontend
+      - name: Coverage summary
+        if: always()
+        run: scripts/ci-coverage-summary.sh frontend >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: coverage-frontend, path: frontend/coverage/, retention-days: 7, if-no-files-found: ignore }
+
+  security:
     runs-on: ubuntu-latest
     env:
       GITLEAKS_VERSION: 8.30.1
@@ -22,51 +75,49 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # full history for gitleaks and the forbidden-word scan
-
       - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            backend/package-lock.json
-            frontend/package-lock.json
-
+        with: { node-version: 24 } # same npm as the other jobs for a reproducible audit
       - name: Install gitleaks
         run: |
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | tar -xz -C /usr/local/bin gitleaks
           gitleaks version
-
-      - name: Install dependencies
-        run: |
-          npm ci
-          npm ci --prefix backend
-          npm ci --prefix frontend
-          npm --prefix backend run prisma:generate
-
-      - name: Quality gate (scripts/verify.sh)
+      - name: gitleaks · forbidden word · npm audit
         env:
           FORBIDDEN_WORD: ${{ secrets.FORBIDDEN_WORD }}
-        run: scripts/verify.sh
+        run: scripts/verify.sh security # npm audit only needs the lockfiles
 
-      - name: Traceability (scripts/trace.ts)
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with: { packages: root }
+      - name: Traceability (AC → tests, shipped specs)
         run: npx tsx scripts/trace.ts --shipped --out trace.md
-
-      - name: Coverage summary
+      - name: Traceability summary
         if: always()
         run: |
-          {
-            echo "## Coverage"
-            for pkg in backend frontend; do
-              f="$pkg/coverage/coverage-summary.json"
-              if [ -f "$f" ]; then node -e "const t=require('./$f').total;console.log('**$pkg**: lines '+t.lines.pct+'% · branches '+t.branches.pct+'% · functions '+t.functions.pct+'% · statements '+t.statements.pct+'%')"; else echo "**$pkg**: sin datos (verify falló antes de la cobertura)"; fi
-            done
-            echo; echo "## Trazabilidad"; cat trace.md 2>/dev/null
-          } >> "$GITHUB_STEP_SUMMARY"
+          { echo "## Trazabilidad"; cat trace.md 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with: { packages: backend frontend }
+      - run: scripts/verify.sh build
+      - name: Frontend bundle for E2E (API mocked in the browser)
+        working-directory: frontend
+        env: { VITE_API_URL: 'http://api.mock' }
+        run: npx vite build --logLevel warn --outDir dist-e2e
+      - uses: actions/upload-artifact@v4
+        with: { name: frontend-e2e-dist, path: frontend/dist-e2e/, retention-days: 3 }
 
   e2e:
-    # Spec 007: full checkout flow against the production build with a mocked API.
+    # Spec 007: full checkout flow on the bundle from `build`, API mocked, three browsers.
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -74,22 +125,15 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
+      - uses: ./.github/actions/setup
+        with: { packages: frontend }
+      - uses: actions/download-artifact@v4
+        with: { name: frontend-e2e-dist, path: frontend/dist }
       - name: Install Playwright browsers (Chromium, Firefox, WebKit)
         run: npx playwright install --with-deps chromium firefox webkit
-
-      - name: E2E (375×667, three browsers)
+      - name: E2E (375×667, three browsers, prebuilt bundle)
+        env: { E2E_PREBUILT: '1' }
         run: npm run e2e
-
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4

@@ -566,6 +566,7 @@ El seed **no** repone stock a propósito (`upsert` con `update: {}`), para no de
 export FORBIDDEN_WORD=...          # palabra que no puede aparecer en el repo; nunca se escribe en un archivo
 scripts/verify.sh                  # lint, typecheck, tests + cobertura, build, npm audit (back y front), gitleaks y nombre prohibido
 VERIFY_FAST=1 scripts/verify.sh    # variante del pre-commit (sin build ni audit)
+scripts/verify.sh test-backend     # una sola etapa (lint, typecheck, test-backend, test-frontend, build, security)
 npx tsx scripts/trace.ts           # matriz AC → tests
 ```
 

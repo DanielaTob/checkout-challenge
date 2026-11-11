@@ -83,7 +83,7 @@ GitFlow ligero. **Nunca hagas `git push` sin que la persona lo pida.**
 - Los PR se integran con **merge commit** (`gh pr merge --merge`), nunca `--squash`, para conservar el historial por tarea.
 - **Release**: PR `develop → main`; tras el merge, tag anotado en `main` (`git tag -a v0.1.0 -m "…"`): `v0.1.0` = esqueleto desplegado, `v1.0.0` = entrega final.
 - **Hotfix**: `git checkout -b hotfix/x main` → PR a `main` → tag de parche (`v1.0.1`) → PR (o merge) de `main` a `develop`.
-- La CI (`.github/workflows/ci.yml`) corre en los PR y pushes hacia `develop` y `main`.
+- La CI (`.github/workflows/ci.yml`) corre en los PR y pushes hacia `develop` y `main`, por etapas: `lint` + `typecheck` → `test-backend` + `test-frontend` → `build` → `e2e`, con `security` y `trace` en paralelo. Cada job llama a una sección de `scripts/verify.sh`; no dupliques lógica en el YAML.
 
 ```mermaid
 gitGraph
@@ -117,6 +117,7 @@ gitGraph
 ```bash
 scripts/verify.sh                  # puerta de calidad completa (requiere FORBIDDEN_WORD exportada)
 VERIFY_FAST=1 scripts/verify.sh    # lo que corre el pre-commit (sin builds ni npm audit)
+scripts/verify.sh lint typecheck   # solo algunas secciones (lint, typecheck, test-backend, test-frontend, build, security); cada etapa de la CI llama a una
 npx tsx scripts/trace.ts           # matriz criterios → tests (todas las specs)
 npx tsx scripts/trace.ts --spec 004
 npx tsx scripts/trace.ts --shipped # solo specs con tasks.md completo (lo usa la CI)

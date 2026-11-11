@@ -52,12 +52,21 @@ describe('infra/github-oidc.yaml', () => {
     );
   });
 
-  it('scopes the execution role to project resources and never grants iam:* or admin', () => {
+  it('scopes the execution role to project resources and never allows iam:* or admin, and cannot touch the CD roles', () => {
     const execRole = resource('CloudFormationExecutionRole');
     expect(execRole).toContain('Service: cloudformation.amazonaws.com');
     expect(execRole).not.toMatch(/Action: ['"]?\*['"]?\s*$/m);
-    expect(execRole).not.toContain('iam:*');
+    expect(execRole).not.toMatch(/Effect: Allow\n\s+Action: iam:\*/);
     expect(execRole).not.toContain('AdministratorAccess');
+    expect(execRole).not.toContain('cloudfront:*');
+    // It cannot edit the CD roles (its own policy or the OIDC trust of the deploy role).
+    expect(execRole).toMatch(
+      /Effect: Deny\n\s+Action: iam:\*\n\s+Resource:\n\s+- !Sub 'arn:aws:iam::\$\{AWS::AccountId\}:role\/\$\{ProjectName\}-cfn-exec'\n\s+- !Sub 'arn:aws:iam::\$\{AWS::AccountId\}:role\/\$\{ProjectName\}-github-deploy'/,
+    );
+    // Managed policies: only the two the Lambda role needs.
+    expect(execRole).toMatch(
+      /Action: iam:AttachRolePolicy\n[\s\S]*?ArnEquals:/,
+    );
     expect(execRole).toContain(
       "Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'",
     );

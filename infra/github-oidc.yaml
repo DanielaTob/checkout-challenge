@@ -131,7 +131,6 @@ Resources:
                   - iam:TagRole
                   - iam:UntagRole
                   - iam:PassRole
-                  - iam:AttachRolePolicy
                   - iam:DetachRolePolicy
                   - iam:PutRolePolicy
                   - iam:GetRolePolicy
@@ -139,6 +138,21 @@ Resources:
                   - iam:ListRolePolicies
                   - iam:ListAttachedRolePolicies
                 Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'
+              - Sid: FunctionRoleManagedPolicies # only the two AWS policies the Lambda role uses
+                Effect: Allow
+                Action: iam:AttachRolePolicy
+                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'
+                Condition:
+                  ArnEquals:
+                    iam:PolicyARN:
+                      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+                      - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+              - Sid: NeverTouchTheCdRoles # the execution role cannot widen itself or the OIDC trust
+                Effect: Deny
+                Action: iam:*
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-cfn-exec'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-github-deploy'
               - Sid: Buckets
                 Effect: Allow
                 Action: s3:*
@@ -147,7 +161,21 @@ Resources:
                   - !Sub 'arn:aws:s3:::${ProjectName}-*/*'
               - Sid: CloudFront
                 Effect: Allow
-                Action: cloudfront:*
+                Action:
+                  - cloudfront:Get*
+                  - cloudfront:List*
+                  - cloudfront:CreateDistribution
+                  - cloudfront:CreateDistributionWithTags
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:DeleteDistribution
+                  - cloudfront:TagResource
+                  - cloudfront:UntagResource
+                  - cloudfront:CreateOriginAccessControl
+                  - cloudfront:UpdateOriginAccessControl
+                  - cloudfront:DeleteOriginAccessControl
+                  - cloudfront:CreateResponseHeadersPolicy
+                  - cloudfront:UpdateResponseHeadersPolicy
+                  - cloudfront:DeleteResponseHeadersPolicy
                 Resource: '*'
               - Sid: Logs
                 Effect: Allow

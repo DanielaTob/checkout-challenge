@@ -10,7 +10,7 @@ retry() { local i; for i in 1 2 3 4 5 6; do "$@" && return 0; sleep 10; done; re
 
 echo "▶ smoke test"
 retry curl -fsS --max-time 30 -o "$TMP/health.json" "$API_URL/health" || fail "$API_URL/health unreachable"
-grep -q '"status":"ok"' "$TMP/health.json" || fail "/health did not return status ok"
+grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' "$TMP/health.json" || fail "/health did not return status ok"
 echo "  ✔ API /health ok"
 
 retry curl -fsS --max-time 30 -o "$TMP/index.html" "$WEB_URL/" || fail "$WEB_URL unreachable"

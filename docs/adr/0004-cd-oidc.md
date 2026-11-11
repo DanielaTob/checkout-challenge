@@ -28,6 +28,19 @@ sin guardar llaves de AWS en GitHub.
 
 ## Consecuencias
 
+- **Riesgo aceptado:** el rol de ejecución puede crear roles `checkout-challenge-*` con políticas
+  inline. Quien mergea a `main` ya controla la plantilla, así que un permissions boundary no
+  cambia el techo de confianza para un proyecto de una persona. Los dos roles del CD quedan
+  protegidos con un `Deny` explícito, y las políticas gestionadas que se pueden adjuntar son una
+  lista cerrada.
+- **Restricción a `main`:** está en tres sitios. La regla de ramas del environment `production`,
+  el `if` del job `deploy` (en `ci.yml` y en `deploy.yml`) y la confianza OIDC (`sub` del
+  environment).
+- **Si el smoke test falla tras desplegar:** el job queda en rojo y la versión nueva ya está
+  publicada. Para volver atrás, PR de `git revert` del merge en `main` (hotfix); su merge
+  redespliega la versión anterior. CloudFormation solo hace rollback solo si falla el propio
+  `deploy`.
+
 - Un fallo de permisos del rol de ejecución hace rollback del stack; los permisos se amplían en
   `infra/github-oidc.yaml` y se re-aplica el bootstrap.
 - `deploy.sh` local sigue funcionando (con o sin `CFN_EXEC_ROLE_ARN`).

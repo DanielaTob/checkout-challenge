@@ -18,6 +18,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Defence in depth: the `production` environment also only allows `main`.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
@@ -55,13 +57,19 @@ jobs:
         run: scripts/deploy.sh
 
       - name: Smoke test (/health + SPA renders against this API)
-        run: scripts/smoke-test.sh "${{ steps.deploy.outputs.api_url }}" "${{ steps.deploy.outputs.web_url }}"
+        env:
+          API_URL: ${{ steps.deploy.outputs.api_url }}
+          WEB_URL: ${{ steps.deploy.outputs.web_url }}
+        run: scripts/smoke-test.sh "$API_URL" "$WEB_URL"
 
       - name: Summary
+        env:
+          API_URL: ${{ steps.deploy.outputs.api_url }}
+          WEB_URL: ${{ steps.deploy.outputs.web_url }}
         run: |
           {
             echo "## Despliegue"
             echo "- Commit: \`${GITHUB_SHA::7}\`"
-            echo "- Front: ${{ steps.deploy.outputs.web_url }}"
-            echo "- API: ${{ steps.deploy.outputs.api_url }} (Swagger: /docs)"
+            echo "- Front: $WEB_URL"
+            echo "- API: $API_URL (Swagger: /docs)"
           } >> "$GITHUB_STEP_SUMMARY"

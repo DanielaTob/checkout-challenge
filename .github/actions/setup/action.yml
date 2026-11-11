@@ -1,0 +1,24 @@
+name: Setup
+description: Node 24 with npm cache and `npm ci` for the requested packages (+ Prisma client for the backend).
+inputs:
+  packages:
+    description: Space-separated list among root, backend, frontend
+    default: root backend frontend
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 24
+        cache: npm
+        cache-dependency-path: |
+          package-lock.json
+          backend/package-lock.json
+          frontend/package-lock.json
+    - name: npm ci (${{ inputs.packages }})
+      shell: bash
+      run: |
+        for pkg in ${{ inputs.packages }}; do
+          if [ "$pkg" = root ]; then npm ci --ignore-scripts; else npm ci --prefix "$pkg"; fi
+        done
+        if [[ " ${{ inputs.packages }} " == *" backend "* ]]; then npm --prefix backend run prisma:generate; fi

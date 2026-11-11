@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # Quality gate. Exits non-zero if any check fails.
-#   scripts/verify.sh          full gate (used by `ship`, CI)
-#   VERIFY_FAST=1 verify.sh    pre-commit: skips builds and npm audit (CI still runs them)
+#   scripts/verify.sh                 full gate (used by `ship`)
+#   VERIFY_FAST=1 scripts/verify.sh   pre-commit: skips builds and npm audit (CI still runs them)
+#   scripts/verify.sh <section>...    only some sections; each CI stage calls one, so the
+#                                     logic lives here once (Husky, `ship` and CI share it)
+# Sections: lint, typecheck, test-backend, test-frontend, build, security
+#   (security = gitleaks + forbidden word + npm audit), plus the finer audit, secrets, forbidden.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 FAST="${VERIFY_FAST:-0}"
 FAILED=()
+PACKAGES=(backend frontend)
 
 step() { printf '\n\033[1;34m▶ %s\033[0m\n' "$1"; }
 run() { # run <label> <cmd...>
@@ -15,17 +20,6 @@ run() { # run <label> <cmd...>
   step "$label"
   if "$@"; then printf '\033[32m✔ %s\033[0m\n' "$label"; else FAILED+=("$label"); printf '\033[31m✘ %s\033[0m\n' "$label"; fi
 }
-
-for pkg in backend frontend; do
-  run "$pkg: lint"            npm --prefix "$pkg" run --silent lint
-  run "$pkg: typecheck"       npm --prefix "$pkg" run --silent typecheck
-  # Coverage thresholds (>= 80%) are enforced by each package's Jest config.
-  run "$pkg: tests + coverage" npm --prefix "$pkg" run --silent test:cov -- --ci --silent
-  if [[ "$FAST" != "1" ]]; then
-    run "$pkg: build"         npm --prefix "$pkg" run --silent build
-    run "$pkg: npm audit"     npm --prefix "$pkg" audit --audit-level=high
-  fi
-done
 
 secrets_scan() {
   if ! command -v gitleaks >/dev/null 2>&1; then
@@ -45,7 +39,6 @@ secrets_scan() {
     return $rc
   fi
 }
-run "secrets scan (gitleaks)" secrets_scan
 
 forbidden_word() {
   if [[ -z "${FORBIDDEN_WORD:-}" ]]; then
@@ -60,7 +53,35 @@ forbidden_word() {
   if git remote -v | grep -i -- "$FORBIDDEN_WORD"; then hits=1; fi
   [[ $hits -eq 0 ]] || { echo "Forbidden word found (see above)."; return 1; }
 }
-run "forbidden word" forbidden_word
+
+section() {
+  local pkg
+  case "$1" in
+    lint)          for pkg in "${PACKAGES[@]}"; do run "$pkg: lint" npm --prefix "$pkg" run --silent lint; done ;;
+    typecheck)     for pkg in "${PACKAGES[@]}"; do run "$pkg: typecheck" npm --prefix "$pkg" run --silent typecheck; done ;;
+    # Coverage thresholds (>= 80%) are enforced by each package's Jest config.
+    test-backend)  run "backend: tests + coverage"  npm --prefix backend  run --silent test:cov -- --ci --silent ;;
+    test-frontend) run "frontend: tests + coverage" npm --prefix frontend run --silent test:cov -- --ci --silent ;;
+    build)         for pkg in "${PACKAGES[@]}"; do run "$pkg: build" npm --prefix "$pkg" run --silent build; done ;;
+    audit)         for pkg in "${PACKAGES[@]}"; do run "$pkg: npm audit" npm --prefix "$pkg" audit --audit-level=high; done ;;
+    secrets)       run "secrets scan (gitleaks)" secrets_scan ;;
+    forbidden)     run "forbidden word" forbidden_word ;;
+    security)      section secrets; section forbidden; section audit ;;
+    *) echo "Unknown section: $1 (lint, typecheck, test-backend, test-frontend, build, security, audit, secrets, forbidden)"; exit 2 ;;
+  esac
+}
+
+if [[ $# -gt 0 ]]; then
+  for s in "$@"; do section "$s"; done
+else
+  section lint
+  section typecheck
+  section test-backend
+  section test-frontend
+  if [[ "$FAST" != "1" ]]; then section build; section audit; fi
+  section secrets
+  section forbidden
+fi
 
 echo
 if [[ ${#FAILED[@]} -gt 0 ]]; then

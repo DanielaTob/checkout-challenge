@@ -33,7 +33,8 @@ Implementa la spec `specs/NNN-*/` tarea por tarea. **Nunca hagas `git push` ni a
    gh pr create --base develop --fill-first --body-file <cuerpo según .github/pull_request_template.md>
    ```
    El cuerpo del PR lleva el enlace a la spec, la tabla de AC → tests y el resumen de `scripts/verify.sh`.
-4. El PR se integra en `develop` con merge commit (`gh pr merge --merge`), **nunca** `--squash`, para conservar el historial por tarea.
+4. Espera la revisión de la IA (workflow `AI review`): atiende cada comentario con un commit o responde en el hilo justificando por qué no aplica. Sin revisión o con comentarios pendientes no se mergea.
+5. El PR se integra en `develop` con merge commit (`gh pr merge --merge`), **nunca** `--squash`, para conservar el historial por tarea.
 
 ## Reglas
 - Una spec = una rama = un PR hacia `develop`.

@@ -79,6 +79,7 @@ GitFlow ligero. **Nunca hagas `git push` sin que la persona lo pida.**
 | `feat/NNN-nombre` | Una spec (flujo `ship`) | `develop` | `develop` vía PR |
 | `hotfix/descripcion` | Arreglo urgente en producción | `main` | `main` **y** `develop` |
 
+- **Revisión con IA obligatoria:** cada PR a `develop` o `main` lo revisa automáticamente la IA (`.github/workflows/ai-review.yml`, Action oficial de Claude Code) contra esta guía y la spec enlazada. **No se mergea un PR sin esa revisión y sin atender o responder cada uno de sus comentarios** (arreglo en un commit nuevo o respuesta justificada en el hilo). Los PR ya mergeados no se revisan a posteriori. Cada push genera una revisión nueva; vale el último resumen (lleva el SHA revisado). Mientras no haya protección de rama con el check `AI review / review` requerido, la regla la hace cumplir quien mergea (persona o agente).
 - Los PR se integran con **merge commit** (`gh pr merge --merge`), nunca `--squash`, para conservar el historial por tarea.
 - **Release**: PR `develop → main`; tras el merge, tag anotado en `main` (`git tag -a v0.1.0 -m "…"`): `v0.1.0` = esqueleto desplegado, `v1.0.0` = entrega final.
 - **Hotfix**: `git checkout -b hotfix/x main` → PR a `main` → tag de parche (`v1.0.1`) → PR (o merge) de `main` a `develop`.
@@ -129,6 +130,7 @@ scripts/deploy.sh                  # despliegue completo con CloudFormation (req
 ## Lo que un agente NO debe hacer
 
 - Hacer push sin que se lo pidan.
+- Mergear un PR sin la revisión de la IA o con comentarios suyos sin atender.
 - Leer, imprimir o commitear `.env`.
 - Debilitar tests o umbrales de cobertura para que algo pase.
 - Agregar dependencias pesadas sin justificarlas en el PR.

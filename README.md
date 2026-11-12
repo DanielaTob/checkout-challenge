@@ -577,7 +577,15 @@ flowchart LR
 - **La alarma de latencia p95 salta a 15 s.** `POST /transactions` espera a la pasarela hasta unos 25 s y un pago normal tarda unos 11 s. Con un umbral más bajo, la alarma saltaría con tráfico sano. Es un parámetro (`AlarmLatencyP95Ms`).
 - **Las alarmas no envían notificaciones.** No hay SNS, email ni Slack: se ven en el dashboard y en la consola. Para añadirlas bastaría un topic SNS y `AlarmActions`.
 
-<!-- Capturas del dashboard: se añaden tras el primer despliegue por CD (v1.2.0). -->
+**Dashboard en producción** (2026-11-12, tras desplegar v1.2.1 por CD). Las imágenes salen de los widgets del dashboard, exportados con `aws cloudwatch get-metric-widget-image`. El tráfico es el de la verificación: un pago aprobado (`4242…`), uno rechazado (`4111…`), lecturas, varios 404/400 provocados y el pico de latencia de los pagos, que esperan a la pasarela unos 8–15 s:
+
+![Dashboard de CloudWatch: peticiones, 4xx/5xx, latencia p50/p95 con la línea de la alarma, pagos por estado, errores y duración de la Lambda](docs/screenshots/observabilidad-dashboard.webp)
+
+> La verificación en producción encontró dos fallos que los tests no veían, porque arrancaban la app de otra forma:
+> - Con `bufferLogs`, el handler de Lambda (`app.init()`) nunca vaciaba los logs, así que en CloudWatch no salía nada (#30).
+> - El socket simulado de serverless-express nunca pone `writableFinished` a `true`, así que todas las peticiones salían como `499 aborted` (#31).
+>
+> Los dos se arreglaron como hotfix (v1.2.1), con tests sobre el handler real y sobre una respuesta como la de Lambda.
 
 ## Estructura
 

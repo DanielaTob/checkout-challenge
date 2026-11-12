@@ -73,6 +73,8 @@ describe('Lambda handler (API Gateway HTTP API, payload v2)', () => {
   const invoke = (event: object) =>
     handler(event, context, () => {}) as Promise<LambdaResponse>;
 
+  // Must stay the FIRST test: the startup line is only written by the first (cold) bootstrap;
+  // later tests reuse the cached handler.
   it('AC-010-05 the Lambda writes its JSON logs to stdout: startup and one http.request per invocation with the request id', async () => {
     const out = captureStdout();
     try {

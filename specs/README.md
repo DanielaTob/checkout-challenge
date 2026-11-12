@@ -11,7 +11,7 @@
 | [007-e2e-playwright](007-e2e-playwright/spec.md) | E2E del flujo completo en Chromium, Firefox y WebKit (API simulada) | Implementada |
 | [008-headers-seguridad](008-headers-seguridad/spec.md) | COOP, CORP y Permissions-Policy en CloudFront tras el HTTP Observatory | Implementada |
 | [009-backdrop-resumen](009-backdrop-resumen/spec.md) | Paso Resumen con el patrón Backdrop de Material (móvil y desktop) | Implementada |
-| [010-observabilidad](010-observabilidad/spec.md) | Logs JSON con requestId, eventos de pago, dashboard, alarmas y X-Ray | Borrador |
+| [010-observabilidad](010-observabilidad/spec.md) | Logs JSON con requestId, eventos de pago, dashboard, alarmas y X-Ray | Implementada |
 
 ## Contrato de API (visión global)
 

@@ -27,6 +27,8 @@ Checkout móvil de un producto pagado con tarjeta de crédito a través de una p
 - [Modelo de datos](#modelo-de-datos)
 - [API](#api)
 - [Calidad: cobertura y trazabilidad](#calidad-cobertura-y-trazabilidad)
+- [Pipeline CI/CD](#pipeline-cicd)
+- [Observabilidad](#observabilidad)
 - [Estructura](#estructura)
 - [Desarrollo](#desarrollo)
 - [Git workflow](#git-workflow)
@@ -334,7 +336,7 @@ Jest en los dos paquetes, con umbral **≥ 80 %** en sentencias, ramas, funcione
 
 | Paquete | Tests | Sentencias | Ramas | Funciones | Líneas |
 |---|---|---|---|---|---|
-| Backend (`backend/`) | 197 tests · 38 suites | **100 %** (677/677) | **91.84 %** (304/331) | **100 %** (133/133) | **100 %** (593/593) |
+| Backend (`backend/`) | 258 tests · 45 suites | **99.87 %** (784/785) | **92.34 %** (362/392) | **99.37 %** (158/159) | **100 %** (681/681) |
 | Frontend (`frontend/`) | 209 tests · 35 suites | **99.56 %** (683/686) | **95.04 %** (326/343) | **99.42 %** (173/174) | **100 %** (579/579) |
 
 ```bash
@@ -379,7 +381,7 @@ En la CI, el job **`e2e`** corre en paralelo con `verify` en cada PR y push a `d
 
 > Los E2E encontraron un bug que los tests de Jest no veían: Firefox y Safari cortan el `fetch` en vuelo al recargar, el pago se guardaba como fallido y, al volver, la app pedía la tarjeta en vez de recuperar el pago. Ahora también se busca por `Idempotency-Key` en ese caso (AC-005-05).
 
-### Trazabilidad: 91/91 criterios con test
+### Trazabilidad: 105/105 criterios con test
 
 Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un test con ese ID en el nombre (`it('AC-004-12 …')`). [`scripts/trace.ts`](scripts/trace.ts) arma la matriz y falla si falta alguno; la CI la corre con `--shipped`.
 
@@ -394,7 +396,8 @@ Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un 
 | [007 · E2E con Playwright](specs/007-e2e-playwright/spec.md) | flujo completo en Chromium, Firefox y WebKit con la API simulada, job `e2e` en la CI | 6 | ✅ 6 |
 | [008 · headers de seguridad](specs/008-headers-seguridad/spec.md) | COOP, CORP y Permissions-Policy en CloudFront tras el HTTP Observatory | 3 | ✅ 3 |
 | [009 · backdrop del resumen](specs/009-backdrop-resumen/spec.md) | paso Resumen con el patrón Backdrop de Material, accesibilidad y reduced motion | 5 | ✅ 5 |
-| **Total** | | **91** | **✅ 91/91** |
+| [010 · observabilidad](specs/010-observabilidad/spec.md) | logs JSON con requestId, evento `payment.finalized`, dashboard, alarmas y X-Ray | 14 | ✅ 14 |
+| **Total** | | **105** | **✅ 105/105** |
 
 ```bash
 npx tsx scripts/trace.ts             # matriz completa (todas las specs)
@@ -500,6 +503,82 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 
 </details>
 
+## Pipeline CI/CD
+
+Cada PR hacia `develop` o `main`, y cada push a esas ramas, pasa por la CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). La CI está dividida en etapas visibles y cada job llama a una sección de `scripts/verify.sh`, el mismo script que usa el pre-commit de Husky, así que la lógica de calidad está en un solo sitio. Un push a `main` con todo en verde despliega solo ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)).
+
+```mermaid
+flowchart LR
+  subgraph PR["PR o push a develop / main"]
+    direction LR
+    L["lint"] --> TB["test-backend<br/>(cobertura ≥ 80 %)"]
+    TC["typecheck"] --> TB
+    L --> TF["test-frontend<br/>(cobertura ≥ 80 %)"]
+    TC --> TF
+    TB --> B["build<br/>(back + front, bundle E2E)"]
+    TF --> B
+    B --> E["e2e<br/>(Playwright × 3 navegadores)"]
+    S["security<br/>(gitleaks · nombre prohibido · npm audit)"]
+    T["trace<br/>(AC → tests)"]
+    R["review<br/>(revisión con IA)"]
+  end
+  E --> D["deploy<br/>(solo push a main)"]
+  S --> D
+  T --> D
+  D --> SM["smoke test<br/>/health + el front renderiza"]
+```
+
+| Etapa | Qué hace | Sección de `verify.sh` |
+|---|---|---|
+| `lint`, `typecheck` | ESLint/oxlint y `tsc` en back y front | `lint`, `typecheck` |
+| `test-backend`, `test-frontend` | Jest con umbral del 80 %; la cobertura va al resumen del job y se sube como artefacto | `test-backend`, `test-frontend` |
+| `security` | gitleaks sobre todo el historial, palabra prohibida en archivos, ramas y commits, y `npm audit` | `security` |
+| `trace` | Comprueba que cada AC de las specs entregadas tiene un test | `scripts/trace.ts --shipped` |
+| `build` | Build de producción de back y front, y bundle del front con la API simulada para E2E | `build` |
+| `e2e` | Flujo completo en Chromium, Firefox y WebKit a 375×667 sobre el bundle de `build` | — |
+| `review` | La IA revisa el diff contra AGENTS.md y la spec enlazada, con comentarios en línea y un resumen ([`ai-review.yml`](.github/workflows/ai-review.yml)) | — |
+| `deploy` | Solo en push a `main` y después de `e2e`, `security` y `trace`: `scripts/deploy.sh` y smoke test | — |
+
+**Protección de rama**: `develop` y `main` exigen en verde `review`, `lint`, `typecheck`, `test-backend`, `test-frontend`, `build`, `e2e`, `security` y `trace`. No piden aprobación humana. El admin puede saltársela, solo para emergencias. No se mergea sin haber atendido o respondido los comentarios de la IA.
+
+**Credenciales del CD** ([ADR 0005](docs/adr/0005-cd-usuario-iam.md)): la primera opción era OIDC ([ADR 0004](docs/adr/0004-cd-oidc.md)), pero el SCP de la cuenta deniega `iam:CreateOpenIDConnectProvider`. Por eso el CD usa un usuario IAM dedicado, `checkout-ci-deployer` ([`infra/ci-deployer.yaml`](infra/ci-deployer.yaml)), con estas mitigaciones:
+- Mínimo privilegio: el usuario solo puede ejecutar change sets del stack, subir los artefactos y el front, e invalidar CloudFront. Lo demás lo hace un rol de ejecución de CloudFormation limitado a `checkout-challenge-*`.
+- Las llaves son secretos del environment `production`, que solo admite `main`.
+- El usuario no puede gestionar sus propias llaves, que se rotan cada 90 días.
+
+## Observabilidad
+
+[Spec 010](specs/010-observabilidad/spec.md). El objetivo es poder responder en producción «¿qué pasó con esta petición?» y «¿cómo van los pagos?» sin leer código.
+
+**Logs JSON estructurados.** La API escribe una línea JSON por evento directamente en stdout, sin `console.*`, para que el runtime de Lambda no añada prefijo y CloudWatch pueda filtrar por campos. Cada línea lleva `timestamp`, `level`, `context` y, dentro de una petición, `requestId`. El nivel mínimo se configura con `LOG_LEVEL`.
+
+```json
+{"timestamp":"2026-11-12T10:00:00.123Z","level":"info","context":"Http","requestId":"6c1e…","event":"http.request","method":"POST","path":"/transactions","statusCode":201,"durationMs":10842.3}
+{"timestamp":"2026-11-12T10:00:00.120Z","level":"info","context":"Payments","requestId":"6c1e…","event":"payment.finalized","reference":"TX-…","status":"APPROVED","amountInCents":51280000,"quantity":2,"cardBrand":"VISA"}
+```
+
+- **`x-request-id`**: si la petición trae uno válido (`[A-Za-z0-9._-]{1,128}`), se reutiliza; si no, se genera un UUID v4. Vuelve en la respuesta (CORS lo expone al navegador) y aparece en todas las líneas de esa petición, incluidas las del adaptador de la pasarela.
+- **Log de acceso**: una línea `http.request` por petición, con método, ruta sin query, código y duración. El nivel depende del código: `info` para 2xx/3xx, `warn` para 4xx y `error` para 5xx.
+- **Evento de negocio**: `payment.finalized` se emite una sola vez cuando la transacción sale de PENDING (APPROVED, DECLINED o ERROR). Sale de un puerto del dominio (`PaymentEvents`), así que el dominio no sabe que acaba en un log. El repositorio indica si fue esa llamada la que cerró la transacción, de modo que un poll y una recarga simultáneos no la cuentan dos veces.
+- **Tarjeta**: el número y el CVC nunca llegan a los logs. Un test captura stdout en los casos 201, 400, 422 y 502 con nivel `debug`. Además, el logger redacta como `[REDACTED]` cualquier secuencia de 13 a 19 dígitos o cualquier clave `number`, `cvc` o `cvv` que se registre por error.
+
+**Métricas, dashboard y alarmas** ([`infra/template.yaml`](infra/template.yaml)):
+- Tres filtros de métricas sobre el log group de la Lambda convierten `payment.finalized` en `CheckoutChallenge/PaymentsApproved`, `PaymentsDeclined` y `PaymentsError`.
+- El dashboard de CloudWatch `checkout-challenge` muestra:
+  - peticiones, 4xx, 5xx y latencia p50/p95 de la HTTP API;
+  - errores, throttles y duración de la Lambda;
+  - pagos por estado;
+  - el estado de las alarmas;
+  - una tabla de Logs Insights con los últimos `warn` y `error`.
+- Hay dos alarmas: `checkout-challenge-api-5xx` (5 o más 5xx en 5 minutos) y `checkout-challenge-api-latency-p95` (p95 por encima de 15 s durante dos periodos de 5 minutos).
+
+**Decisiones**
+- **X-Ray solo en la Lambda.** Las HTTP API (v2) de API Gateway no admiten trazas activas; solo las REST API. La traza empieza en la Lambda (`TracingConfig: Active`).
+- **La alarma de latencia p95 salta a 15 s.** `POST /transactions` espera a la pasarela hasta unos 25 s y un pago normal tarda unos 11 s. Con un umbral más bajo, la alarma saltaría con tráfico sano. Es un parámetro (`AlarmLatencyP95Ms`).
+- **Las alarmas no envían notificaciones.** No hay SNS, email ni Slack: se ven en el dashboard y en la consola. Para añadirlas bastaría un topic SNS y `AlarmActions`.
+
+<!-- Capturas del dashboard: se añaden tras el primer despliegue por CD (v1.2.0). -->
+
 ## Estructura
 
 ```
@@ -578,7 +657,7 @@ scripts/build-lambda.sh            # bundle de la Lambda en .build/ (poda depend
 scripts/deploy.sh                  # CloudFormation (infra/template.yaml): Lambda + API Gateway + S3 + CloudFront, migraciones, seed, subida de la SPA y smoke test
 ```
 
-`deploy.sh` lee `backend/.env.production`, que no se commitea. Las decisiones de infraestructura están en [`docs/adr/0001-neon-y-lambda.md`](docs/adr/0001-neon-y-lambda.md).
+Normalmente no hace falta: cada merge a `main` despliega por CD ([Pipeline CI/CD](#pipeline-cicd)). En local, `deploy.sh` lee `backend/.env.production`, que no se commitea; en CI lee la configuración del environment `production`. Las decisiones de infraestructura están en [`docs/adr/0001-neon-y-lambda.md`](docs/adr/0001-neon-y-lambda.md).
 
 ## Git workflow
 
@@ -594,7 +673,7 @@ GitFlow ligero.
 - Los PR se integran con **merge commit** (`gh pr merge --merge`), nunca `--squash`, para conservar el historial por tarea.
 - **Release**: PR `develop → main`; tras el merge, tag anotado en `main` (`git tag -a v0.1.0 -m "…"`): `v0.1.0` = esqueleto desplegado, `v1.0.0` = entrega final.
 - **Hotfix**: `git checkout -b hotfix/x main` → PR a `main` → tag de parche (`v1.0.1`) → PR (o merge) de `main` a `develop`.
-- La CI (`.github/workflows/ci.yml`) corre en los PR y pushes hacia `develop` y `main`.
+- La CI (`.github/workflows/ci.yml`) corre en los PR y pushes hacia `develop` y `main`. Un push a `main` con la CI en verde despliega solo (ver [Pipeline CI/CD](#pipeline-cicd)).
 
 ```mermaid
 gitGraph

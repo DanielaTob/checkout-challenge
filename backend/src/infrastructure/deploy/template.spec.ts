@@ -141,3 +141,89 @@ describe('infra/template.yaml', () => {
     expect(template).not.toMatch(/prv_(test|prod)_|postgres(ql)?:\/\//);
   });
 });
+
+describe('infra/template.yaml — observability (spec 010)', () => {
+  /** DashboardBody with !Sub placeholders filled, parsed as JSON. */
+  const dashboardBody = () => {
+    const block = resource('Dashboard');
+    const start = block.indexOf('DashboardBody: !Sub |\n');
+    const body = block
+      .slice(start + 'DashboardBody: !Sub |\n'.length)
+      .split('\n')
+      .filter((l) => l.startsWith('        ') || l.trim() === '')
+      .join('\n')
+      .replace('${AlarmLatencyP95Ms}', '15000')
+      .replace(/\$\{[^}]+\}/g, 'X');
+    return JSON.parse(body) as {
+      widgets: { type: string; properties: Record<string, unknown> }[];
+    };
+  };
+
+  it.each(['APPROVED', 'DECLINED', 'ERROR'])(
+    'AC-010-11 metric filter for payment.finalized %s on the Lambda log group (value 1, default 0, own namespace)',
+    (status) => {
+      const name = `Payments${status.charAt(0)}${status.slice(1).toLowerCase()}Metric`;
+      const filter = resource(name);
+      expect(filter).toContain('Type: AWS::Logs::MetricFilter');
+      expect(filter).toContain('LogGroupName: !Ref ApiFunctionLogGroup');
+      expect(filter).toContain(
+        `FilterPattern: '{ $.event = "payment.finalized" && $.status = "${status}" }'`,
+      );
+      expect(filter).toMatch(/MetricNamespace: CheckoutChallenge/);
+      expect(filter).toMatch(/MetricValue: '1'/);
+      expect(filter).toMatch(/DefaultValue: 0/);
+    },
+  );
+
+  it('AC-010-12 dashboard: requests, 4xx, 5xx, latency p50/p95, Lambda errors/throttles/duration, payments by status and alarms', () => {
+    const { widgets } = dashboardBody();
+    const metrics = JSON.stringify(
+      widgets.filter((w) => w.type === 'metric').map((w) => w.properties),
+    );
+    for (const m of ['"Count"', '"4xx"', '"5xx"', '"Latency"']) {
+      expect(metrics).toContain(m);
+    }
+    expect(metrics).toContain('"stat":"p50"');
+    expect(metrics).toContain('"stat":"p95"');
+    for (const m of ['"Errors"', '"Throttles"', '"Duration"']) {
+      expect(metrics).toContain(m);
+    }
+    for (const m of ['PaymentsApproved', 'PaymentsDeclined', 'PaymentsError']) {
+      expect(metrics).toContain(`"CheckoutChallenge","${m}"`);
+    }
+    const alarms = widgets.find((w) => w.type === 'alarm');
+    expect(alarms?.properties.alarms).toHaveLength(2);
+    expect(resource('Dashboard')).toContain('${Api5xxAlarm.Arn}');
+    expect(resource('Dashboard')).toContain('${ApiLatencyP95Alarm.Arn}');
+    expect(widgets.some((w) => w.type === 'log')).toBe(true);
+  });
+
+  it('AC-010-13 alarms on HTTP API 5xx and p95 latency, parameterized and notBreaching without data', () => {
+    const errors = resource('Api5xxAlarm');
+    expect(errors).toContain('Type: AWS::CloudWatch::Alarm');
+    expect(errors).toContain('MetricName: 5xx');
+    expect(errors).toContain('Threshold: !Ref Alarm5xxThreshold');
+    expect(errors).toContain('TreatMissingData: notBreaching');
+
+    const latency = resource('ApiLatencyP95Alarm');
+    expect(latency).toContain('MetricName: Latency');
+    expect(latency).toContain('ExtendedStatistic: p95');
+    expect(latency).toContain('Threshold: !Ref AlarmLatencyP95Ms');
+    expect(latency).toContain('TreatMissingData: notBreaching');
+    expect(parameter('AlarmLatencyP95Ms')).toContain('Default: 15000');
+    expect(parameter('Alarm5xxThreshold')).toContain('Default: 5');
+    // Decision: no notifications (no SNS topic, no alarm actions).
+    expect(template).not.toContain('AlarmActions');
+    expect(template).not.toContain('AWS::SNS::Topic');
+  });
+
+  it('AC-010-14 X-Ray active on the Lambda with write permission, LOG_LEVEL set and the dashboard URL as output', () => {
+    expect(resource('ApiFunction')).toMatch(/TracingConfig:\n\s+Mode: Active/);
+    expect(resource('ApiFunctionRole')).toContain(
+      'arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess',
+    );
+    expect(resource('ApiFunction')).toContain('LOG_LEVEL: !Ref LogLevel');
+    expect(section('Outputs')).toContain('DashboardUrl:');
+    expect(section('Outputs')).toContain('#dashboards:name=${Dashboard}');
+  });
+});

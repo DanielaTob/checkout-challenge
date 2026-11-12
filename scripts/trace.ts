@@ -65,7 +65,8 @@ const main = (): void => {
     })
     .sort();
   if (specFiles.length === 0) console.log(`No hay specs que revisar${only ? ` para ${only}` : ''}.`);
-  const acs = specFiles.flatMap((f) => extractAcs(readFileSync(f, 'utf8'))).sort();
+  // A spec may mention another spec's AC (e.g. 011 refers to AC-005-04): count each AC once.
+  const acs = [...new Set(specFiles.flatMap((f) => extractAcs(readFileSync(f, 'utf8'))))].sort();
 
   const tests = ['backend', 'frontend']
     .flatMap((pkg) => walk(join(ROOT, pkg), (p) => TEST_RE.test(p)))

@@ -40,32 +40,33 @@ Interfaz mobile-first (desde iPhone SE 375×667) para una tienda de demostració
 
 - **Producto**: tarjetas de igual altura con badge de stock ("Quedan N", ámbar con 5 o menos, "Agotado" con el botón deshabilitado) y el botón **Pay with credit card** alineado abajo.
 - **Tarjeta y entrega**: modal con bloques "Tarjeta" y "Entrega", logo VISA/MasterCard dentro del input, errores bajo cada campo y **Continuar** fijo abajo con scroll interno.
-- **Resumen**: componente [Backdrop de Material](https://m2.material.io/components/backdrop) ([spec 009](specs/009-backdrop-resumen/spec.md)), igual en móvil y desktop. La **capa trasera** tiene el producto, el selector − n + y **Editar datos**. La **capa delantera** va anclada abajo, ocupa todo el ancho del contenedor, tiene esquinas superiores de 16 px y el subencabezado «Resumen del pedido», con el desglose, la tarjeta enmascarada y **Pagar**. El subencabezado (o su chevron) cambia la capa activa: con la trasera activa, la delantera muestra solo el subencabezado y el total, con un scrim suave. **Esc** vuelve a la delantera. En desktop no hay diálogo centrado: el mismo patrón vive en el contenedor de 1080 px y la delantera usa dos columnas.
+- **Resumen**: dos capas fijas inspiradas en el [Backdrop de Material](https://m2.material.io/components/backdrop) ([spec 009](specs/009-backdrop-resumen/spec.md), [ADR 0006](docs/adr/0006-resumen-dos-capas-fijas.md)). La **capa trasera** tiene el producto, el selector − n + y **Editar datos**. La **capa delantera** tiene el subencabezado «Resumen del pedido», el desglose, la tarjeta enmascarada y **Pagar**. Las dos se ven siempre: no hay toggle para colapsar ni scrim. En móvil, la trasera es compacta y va arriba, y la delantera es una hoja anclada abajo con esquinas superiores de 16 px. En desktop son dos columnas en el contenedor de 1080 px.
+- **Tras la compra** ([spec 011](specs/011-limpieza-tras-compra/spec.md)): si el pago se aprueba, al volver a la tienda se borran del estado y de `localStorage` los datos de entrega y todo el progreso del checkout. Si se rechaza, la entrega se conserva para **Intentar de nuevo**.
 - **Resultado**: tarjeta centrada con ícono de estado, referencia en una línea (monoespaciada, truncada al medio, con botón de copiar), total y tarjeta enmascarada.
 - **Vuelta a la tienda**: la tarjeta cuyo stock cambió se resalta y se anuncia a lectores de pantalla.
 - **Accesibilidad**: contraste WCAG AA en todo el texto (mínimo 5,1:1), `focus-visible` en todos los controles, roles y `aria-*` en modales, errores y estados (`aria-expanded`/`aria-controls` en el backdrop, con el foco siguiendo a la capa activa), transiciones de 150–220 ms que respetan `prefers-reduced-motion`. Sin fuentes ni recursos externos (la CSP de CloudFront solo permite `'self'`).
 
-Verificado con Playwright a 375×667 y 1280×800 (los E2E corren en Chromium, Firefox y WebKit): sin desbordamiento horizontal ni errores de consola, y **Pagar** visible sin scroll a 375×667. Las capturas son de la versión v1.1.0, con la API simulada.
+Verificado con Playwright a 375×667 y 1280×800 (los E2E corren en Chromium, Firefox y WebKit): sin desbordamiento horizontal ni errores de consola, y **Pagar** visible sin scroll a 375×667. Las capturas son con la API simulada: las del resumen, de v1.3.0; el resto, de v1.1.0 (esas pantallas no cambiaron).
 
 ### Móvil (375×667)
 
-| 1. Producto | 2. Tarjeta y entrega | 3. Resumen (capa delantera) | 4. Resultado | 5. Stock actualizado |
+| 1. Producto | 2. Tarjeta y entrega | 3. Resumen | 4. Resultado | 5. Stock actualizado |
 |---|---|---|---|---|
-| <img src="docs/screenshots/movil-1-producto.webp" width="170" alt="Pantalla de producto en móvil"> | <img src="docs/screenshots/movil-2-datos.webp" width="170" alt="Modal de tarjeta y entrega en móvil"> | <img src="docs/screenshots/movil-3-resumen.webp" width="170" alt="Resumen con la capa delantera activa: desglose, tarjeta enmascarada y Pagar anclados abajo"> | <img src="docs/screenshots/movil-4-aprobado.webp" width="170" alt="Pago aprobado en móvil"> | <img src="docs/screenshots/movil-5-stock-actualizado.webp" width="170" alt="Producto con el stock actualizado y resaltado en móvil"> |
+| <img src="docs/screenshots/movil-1-producto.webp" width="170" alt="Pantalla de producto en móvil"> | <img src="docs/screenshots/movil-2-datos.webp" width="170" alt="Modal de tarjeta y entrega en móvil"> | <img src="docs/screenshots/movil-3-resumen.webp" width="170" alt="Resumen en móvil: arriba el producto, la cantidad y Editar datos; abajo la hoja con el desglose, la tarjeta enmascarada y Pagar"> | <img src="docs/screenshots/movil-4-aprobado.webp" width="170" alt="Pago aprobado en móvil"> | <img src="docs/screenshots/movil-5-stock-actualizado.webp" width="170" alt="Producto con el stock actualizado y resaltado en móvil"> |
 
-| 3. Resumen (capa trasera) | Pago rechazado |
-|---|---|
-| <img src="docs/screenshots/movil-3-resumen-trasera.webp" width="170" alt="Resumen con la capa trasera activa: cantidad y Editar datos; la delantera abajo con scrim y total"> | <img src="docs/screenshots/movil-4-rechazado.webp" width="170" alt="Pago rechazado en móvil"> |
+| Pago rechazado |
+|---|
+| <img src="docs/screenshots/movil-4-rechazado.webp" width="170" alt="Pago rechazado en móvil"> |
 
 ### Desktop (1280×800)
 
 | Producto | Tarjeta y entrega |
 |---|---|
 | <img src="docs/screenshots/desktop-1-producto.webp" alt="Pantalla de producto en desktop"> | <img src="docs/screenshots/desktop-2-datos.webp" alt="Modal de tarjeta y entrega en desktop"> |
-| **Resumen: capa delantera** | **Resumen: capa trasera** |
-| <img src="docs/screenshots/desktop-3-resumen.webp" alt="Backdrop en desktop con la capa delantera activa en el contenedor centrado"> | <img src="docs/screenshots/desktop-3-resumen-trasera.webp" alt="Backdrop en desktop con la capa trasera activa"> |
-| **Resultado** | **Stock actualizado** |
-| <img src="docs/screenshots/desktop-4-aprobado.webp" alt="Pago aprobado en desktop"> | <img src="docs/screenshots/desktop-5-stock-actualizado.webp" alt="Producto con el stock actualizado en desktop"> |
+| **Resumen** | **Resultado** |
+| <img src="docs/screenshots/desktop-3-resumen.webp" alt="Resumen en desktop en dos columnas: producto, cantidad y Editar datos a la izquierda; desglose, tarjeta y Pagar a la derecha"> | <img src="docs/screenshots/desktop-4-aprobado.webp" alt="Pago aprobado en desktop"> |
+| **Stock actualizado** | |
+| <img src="docs/screenshots/desktop-5-stock-actualizado.webp" alt="Producto con el stock actualizado en desktop"> | |
 
 ## Arquitectura
 
@@ -336,8 +337,8 @@ Jest en los dos paquetes, con umbral **≥ 80 %** en sentencias, ramas, funcione
 
 | Paquete | Tests | Sentencias | Ramas | Funciones | Líneas |
 |---|---|---|---|---|---|
-| Backend (`backend/`) | 258 tests · 45 suites | **99.87 %** (784/785) | **92.34 %** (362/392) | **99.37 %** (158/159) | **100 %** (681/681) |
-| Frontend (`frontend/`) | 209 tests · 35 suites | **99.56 %** (683/686) | **95.04 %** (326/343) | **99.42 %** (173/174) | **100 %** (579/579) |
+| Backend (`backend/`) | 267 tests · 46 suites | **99.87 %** (791/792) | **92.46 %** (368/398) | **99.38 %** (161/162) | **100 %** (686/686) |
+| Frontend (`frontend/`) | 214 tests · 36 suites | **99.55 %** (665/668) | **94.87 %** (315/332) | **99.4 %** (167/168) | **100 %** (567/567) |
 
 ```bash
 cd backend && npm run test:cov
@@ -356,9 +357,12 @@ El flujo completo se prueba en **Chromium, Firefox y WebKit** (el motor de Safar
 | Tarjeta rechazada `4111…` | «Pago rechazado» con el motivo; el stock no cambia |
 | Recarga en el resumen | vuelve al formulario con la entrega conservada y la tarjeta vacía; se reingresa y se paga |
 | Recarga durante el pago | recupera el pago por su `Idempotency-Key`, sin un segundo `POST /transactions` |
-| Backdrop a 375×667 y 1280×800 | delantera anclada abajo a todo el ancho del contenedor, esquinas de 16 px, **Pagar** visible sin scroll, sin diálogo |
-| Cambio de capa | el subencabezado alterna las capas (`aria-expanded`, foco); **Esc** y el scrim suben la delantera; la cantidad recotiza el total |
+| Resumen a 375×667 | trasera compacta arriba; delantera anclada abajo a todo el ancho, esquinas de 16 px; **Pagar** y **Editar datos** visibles sin scroll |
+| Resumen a 1280×800 | dos columnas alineadas arriba en el contenedor centrado, sin diálogo ni hueco, sin scroll |
+| Capas fijas | sin toggle, `aria-expanded` ni scrim; foco al subencabezado; Tab recorre trasera → **Pagar**; la cantidad recotiza a la vista |
 | `prefers-reduced-motion` | las capas no se animan |
+| Tras una compra aprobada | `localStorage` sin entrega, tarjeta ni transacción; la siguiente compra empieza vacía, también tras recargar |
+| Tras un rechazo | **Intentar de nuevo** y **Volver a la tienda** conservan la entrega; la tarjeta se vuelve a pedir |
 
 En todos: sin desbordamiento horizontal, sin errores en la consola y sin el número de tarjeta ni el CVC en `localStorage`.
 
@@ -367,7 +371,7 @@ En todos: sin desbordamiento horizontal, sin errores en la consola y sin el núm
 ```bash
 npm install --prefix frontend      # instala @playwright/test con el resto de dependencias
 npm run e2e:install                # descarga Chromium, Firefox y WebKit (unos cientos de MB, una sola vez; en Linux instala también las librerías del sistema)
-npm run e2e                        # 9 tests × 3 navegadores, sin ventana (~20 s); construye y levanta el front solo
+npm run e2e                        # 12 tests × 3 navegadores, sin ventana (~20 s); construye y levanta el front solo
 npm run e2e:headed                 # solo Chromium, con ventana y 500 ms entre acciones para verlo en vivo
 E2E_SLOWMO=1000 npm run e2e:headed # más lento todavía
 npm run e2e:ui                     # modo UI de Playwright: elegir tests, ver cada paso, el DOM y la red
@@ -381,7 +385,7 @@ En la CI, el job **`e2e`** corre en paralelo con `verify` en cada PR y push a `d
 
 > Los E2E encontraron un bug que los tests de Jest no veían: Firefox y Safari cortan el `fetch` en vuelo al recargar, el pago se guardaba como fallido y, al volver, la app pedía la tarjeta en vez de recuperar el pago. Ahora también se busca por `Idempotency-Key` en ese caso (AC-005-05).
 
-### Trazabilidad: 105/105 criterios con test
+### Trazabilidad: 114/114 criterios con test
 
 Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un test con ese ID en el nombre (`it('AC-004-12 …')`). [`scripts/trace.ts`](scripts/trace.ts) arma la matriz y falla si falta alguno; la CI la corre con `--shipped`.
 
@@ -395,9 +399,10 @@ Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un 
 | [006 · despliegue](specs/006-despliegue/spec.md) | Lambda + HTTP API, S3 + CloudFront (OAC), HTTPS, headers, CORS | 10 | ✅ 10 |
 | [007 · E2E con Playwright](specs/007-e2e-playwright/spec.md) | flujo completo en Chromium, Firefox y WebKit con la API simulada, job `e2e` en la CI | 6 | ✅ 6 |
 | [008 · headers de seguridad](specs/008-headers-seguridad/spec.md) | COOP, CORP y Permissions-Policy en CloudFront tras el HTTP Observatory | 3 | ✅ 3 |
-| [009 · backdrop del resumen](specs/009-backdrop-resumen/spec.md) | paso Resumen con el patrón Backdrop de Material, accesibilidad y reduced motion | 5 | ✅ 5 |
+| [009 · resumen en dos capas](specs/009-backdrop-resumen/spec.md) | paso Resumen en dos capas fijas (móvil y desktop), accesibilidad y reduced motion | 6 | ✅ 6 |
 | [010 · observabilidad](specs/010-observabilidad/spec.md) | logs JSON con requestId, evento `payment.finalized`, dashboard, alarmas y X-Ray | 14 | ✅ 14 |
-| **Total** | | **105** | **✅ 105/105** |
+| [011 · limpieza tras la compra](specs/011-limpieza-tras-compra/spec.md) | borrar entrega y progreso tras APPROVED; conservar la entrega tras DECLINED/ERROR | 5 | ✅ 5 |
+| **Total** | | **114** | **✅ 114/114** |
 
 ```bash
 npx tsx scripts/trace.ts             # matriz completa (todas las specs)
@@ -462,9 +467,12 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 | AC-004-20 | frontend/src/features/payment/paymentSlice.test.ts | ✅ |
 | AC-004-21 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
 | AC-005-01 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
+| AC-005-01 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
 | AC-005-02 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
 | AC-005-03 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
 | AC-005-04 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
+| AC-005-04 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
+| AC-005-05 | frontend/src/app/recoverPayment.test.tsx | ✅ |
 | AC-005-05 | frontend/src/app/recoverPayment.test.tsx | ✅ |
 | AC-005-06 | frontend/src/app/noCardLeak.test.tsx | ✅ |
 | AC-005-07 | frontend/src/app/persistence.test.ts | ✅ |
@@ -500,6 +508,26 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 | AC-009-03 | frontend/e2e/backdrop.spec.ts<br>frontend/src/features/payment/SummaryBackdrop.test.tsx | ✅ |
 | AC-009-04 | frontend/e2e/backdrop.spec.ts | ✅ |
 | AC-009-05 | frontend/e2e/backdrop.spec.ts | ✅ |
+| AC-009-06 | frontend/e2e/backdrop.spec.ts | ✅ |
+| AC-010-01 | backend/src/infrastructure/observability/request-logging.middleware.spec.ts<br>backend/src/infrastructure/observability/request-logging.spec.ts | ✅ |
+| AC-010-02 | backend/src/infrastructure/observability/request-logging.spec.ts | ✅ |
+| AC-010-03 | backend/src/infrastructure/observability/request-logging.spec.ts | ✅ |
+| AC-010-04 | backend/src/infrastructure/observability/json-logger.spec.ts<br>backend/src/infrastructure/observability/request-logging.spec.ts | ✅ |
+| AC-010-05 | backend/src/infrastructure/observability/json-logger.spec.ts<br>backend/src/lambda.spec.ts | ✅ |
+| AC-010-06 | backend/src/infrastructure/observability/card-leak-stdout.spec.ts | ✅ |
+| AC-010-07 | backend/src/infrastructure/observability/json-logger.spec.ts<br>backend/src/infrastructure/observability/redact.spec.ts | ✅ |
+| AC-010-08 | backend/src/application/transactions/payment-events.spec.ts<br>backend/src/infrastructure/observability/log-payment-events.spec.ts | ✅ |
+| AC-010-09 | backend/src/application/transactions/payment-events.spec.ts | ✅ |
+| AC-010-10 | backend/src/infrastructure/observability/request-logging.spec.ts | ✅ |
+| AC-010-11 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-010-12 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-010-13 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-010-14 | backend/src/infrastructure/deploy/template.spec.ts | ✅ |
+| AC-011-01 | frontend/src/features/payment/ResultScreen.test.tsx | ✅ |
+| AC-011-02 | frontend/e2e/clear-after-purchase.spec.ts<br>frontend/src/app/clearAfterPurchase.test.tsx | ✅ |
+| AC-011-03 | frontend/e2e/clear-after-purchase.spec.ts<br>frontend/src/app/clearAfterPurchase.test.tsx | ✅ |
+| AC-011-04 | frontend/e2e/clear-after-purchase.spec.ts<br>frontend/src/features/payment/ResultScreen.test.tsx | ✅ |
+| AC-011-05 | frontend/e2e/clear-after-purchase.spec.ts<br>frontend/src/app/clearAfterPurchase.test.tsx<br>frontend/src/features/payment/ResultScreen.test.tsx | ✅ |
 
 </details>
 
@@ -577,7 +605,7 @@ flowchart LR
 - **La alarma de latencia p95 salta a 15 s.** `POST /transactions` espera a la pasarela hasta unos 25 s y un pago normal tarda unos 11 s. Con un umbral más bajo, la alarma saltaría con tráfico sano. Es un parámetro (`AlarmLatencyP95Ms`).
 - **Las alarmas no envían notificaciones.** No hay SNS, email ni Slack: se ven en el dashboard y en la consola. Para añadirlas bastaría un topic SNS y `AlarmActions`.
 
-**Dashboard en producción** (2026-11-12, tras desplegar v1.2.1 por CD). Las imágenes salen de los widgets del dashboard, exportados con `aws cloudwatch get-metric-widget-image`. El tráfico es el de la verificación: un pago aprobado (`4242…`), uno rechazado (`4111…`), lecturas, varios 404/400 provocados y el pico de latencia de los pagos, que esperan a la pasarela unos 8–15 s:
+**Dashboard en producción** (2026-11-12, 01:45 UTC). Las imágenes salen de los widgets del dashboard, exportados con `aws cloudwatch get-metric-widget-image` (series de las últimas 2 h, en UTC). El tráfico es el de las verificaciones de v1.2.1 y de la release v1.3.0. El widget de pagos cuenta los últimos 15 minutos: un pago aprobado (`4242…`) y uno rechazado (`4111…`), hechos desde la app en producción. El p95 de latencia (~14 s) es el de esos pagos, que esperan a la pasarela, y queda bajo la alarma de 15 s:
 
 ![Dashboard de CloudWatch: peticiones, 4xx/5xx, latencia p50/p95 con la línea de la alarma, pagos por estado, errores y duración de la Lambda](docs/screenshots/observabilidad-dashboard.webp)
 

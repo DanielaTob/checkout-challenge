@@ -71,9 +71,12 @@ export function ResultScreen() {
     void dispatch(pollTransaction(transaction.id));
   }, [dispatch, transaction]);
 
+  // Spec 011: after an approved purchase nothing of the checkout stays in the browser (state and
+  // localStorage, which redux-persist rewrites); after a rejection the delivery data is kept.
   const backToShop = () => {
+    const approved = transaction?.status === 'APPROVED';
     dispatch(resetPayment());
-    dispatch(resetCheckout({ keepDelivery: delivery }));
+    dispatch(resetCheckout(approved ? undefined : { keepDelivery: delivery }));
     void dispatch(fetchProducts());
   };
 

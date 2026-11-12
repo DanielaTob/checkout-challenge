@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import type { Context, Handler } from 'aws-lambda';
+import { captureStdout } from './test/capture-stdout';
 
 // Fake environment (no real secrets; /health never touches the database).
 const ENV = {
@@ -11,6 +12,7 @@ const ENV = {
   BASE_FEE_IN_CENTS: '300000',
   DELIVERY_FEE_IN_CENTS: '800000',
   CORS_ORIGINS: 'https://d111111abcdef8.cloudfront.net',
+  LOG_LEVEL: 'info',
 };
 
 const httpApiEvent = (
@@ -71,6 +73,32 @@ describe('Lambda handler (API Gateway HTTP API, payload v2)', () => {
   const invoke = (event: object) =>
     handler(event, context, () => {}) as Promise<LambdaResponse>;
 
+  it('AC-010-05 the Lambda writes its JSON logs to stdout: startup and one http.request per invocation with the request id', async () => {
+    const out = captureStdout();
+    try {
+      await invoke(
+        httpApiEvent('GET', '/health', { 'x-request-id': 'lambda-req-1' }),
+      );
+    } finally {
+      out.restore();
+    }
+    const entries = out.json();
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        context: 'NestApplication',
+        message: 'Nest application successfully started',
+      }),
+    );
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        event: 'http.request',
+        path: '/health',
+        statusCode: 200,
+        requestId: 'lambda-req-1',
+      }),
+    );
+  });
+
   it('AC-006-01 GET /health through an HTTP API v2 event answers 200 {"status":"ok"}', async () => {
     const res = await invoke(httpApiEvent('GET', '/health'));
     expect(res.statusCode).toBe(200);
@@ -90,5 +118,8 @@ describe('Lambda handler (API Gateway HTTP API, payload v2)', () => {
       ENV.CORS_ORIGINS,
     );
     expect(createSpy).toHaveBeenCalledTimes(1);
+    expect(createSpy).toHaveBeenCalledWith(expect.anything(), {
+      bufferLogs: true,
+    });
   });
 });

@@ -11,6 +11,9 @@ let cached: Handler | undefined;
 const bootstrap = async (): Promise<Handler> => {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   configureApp(app, process.env.CORS_ORIGINS);
+  // bufferLogs holds every log until flushed; app.init() (unlike app.listen()) does not flush,
+  // so without this the Lambda wrote no log at all (found in production after v1.2.0).
+  app.flushLogs();
   await app.init();
   return serverlessExpress({
     app: app.getHttpAdapter().getInstance() as Express,

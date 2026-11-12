@@ -107,6 +107,16 @@ describe('JsonLogger (spec 010)', () => {
     ]);
   });
 
+  it('AC-010-05 without a context and outside a request, a logged object still cannot set context or requestId', () => {
+    const { logger, json } = make();
+    logger.log({ event: 'y', context: 'Fake', requestId: 'req-fake' });
+    expect(json()[0]).toEqual({
+      timestamp: '2026-11-11T12:00:00.000Z',
+      level: 'info',
+      event: 'y',
+    });
+  });
+
   it('AC-010-05 adds the requestId of the current request and none outside a request', () => {
     const { logger, json } = make();
     logger.log('boot');

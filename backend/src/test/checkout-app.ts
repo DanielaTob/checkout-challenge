@@ -16,7 +16,11 @@ import { CheckoutModule } from '../infrastructure/checkout.module';
 import { checkoutFixture } from './checkout-fixture';
 
 /** Boots the real HTTP stack (pipes, filters, controllers) on in-memory adapters. */
-export const bootCheckoutApp = async (stock = 5, gateway?: PaymentGateway) => {
+export const bootCheckoutApp = async (
+  stock = 5,
+  gateway?: PaymentGateway,
+  corsOrigins?: string,
+) => {
   const f = checkoutFixture(stock);
   const moduleRef = await Test.createTestingModule({
     imports: [CheckoutModule],
@@ -37,7 +41,7 @@ export const bootCheckoutApp = async (stock = 5, gateway?: PaymentGateway) => {
     .useValue(f.transactions.deliveries)
     .compile();
   const app: INestApplication<App> = moduleRef.createNestApplication();
-  configureApp(app, undefined);
+  configureApp(app, corsOrigins);
   await app.init();
   return { app, ...f };
 };

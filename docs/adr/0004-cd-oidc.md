@@ -1,6 +1,6 @@
 # ADR 0004 — CD con GitHub Actions y OIDC
 
-- Estado: aceptada (2026-11-11)
+- Estado: **reemplazada por [ADR 0005](0005-cd-usuario-iam.md)** (2026-11-11): el SCP de la cuenta deniega `iam:CreateOpenIDConnectProvider`. La estructura del CD (job `deploy` tras la CI, environment `production`, rol de ejecución de CloudFormation y smoke test) se mantiene; solo cambia la credencial.
 
 ## Contexto
 

@@ -11,7 +11,7 @@ Publicar el front y la API en AWS con HTTPS, headers de seguridad y CORS restrin
 
 ## Fuera de alcance
 - Dominio propio y certificado ACM (se usan los dominios de CloudFront y API Gateway).
-- Despliegue automático desde GitHub Actions (OIDC) — el despliegue es manual con `scripts/deploy.sh`.
+- Despliegue automático desde GitHub Actions — en esta spec el despliegue es manual con `scripts/deploy.sh` (el CD llegó después, ADR 0004/0005).
 - WAF, alarmas y dashboards.
 
 ## Criterios de aceptación

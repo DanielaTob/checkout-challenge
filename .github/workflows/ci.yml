@@ -9,7 +9,7 @@ name: CI
 #   security (gitleaks · forbidden word · npm audit)      trace (AC → tests)
 #
 # On a push to main (release/hotfix merge) and only with every stage green, the `deploy` job
-# runs .github/workflows/deploy.yml (CD to AWS through OIDC).
+# runs .github/workflows/deploy.yml (CD to AWS, ADR 0005).
 on:
   pull_request:
     branches: [develop, main]
@@ -153,6 +153,5 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
-      id-token: write
     uses: ./.github/workflows/deploy.yml
     secrets: inherit

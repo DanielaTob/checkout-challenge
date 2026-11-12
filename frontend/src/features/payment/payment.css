@@ -1,7 +1,8 @@
-/* Screen 3: Material Backdrop (m2.material.io/components/backdrop).
+/* Screen 3 in two fixed layers, inspired by the Material Backdrop (spec 009 rev. 2, ADR 0006).
    Back layer: product + the controls that change the order (quantity, "Editar datos").
-   Front layer: "Resumen del pedido", anchored at the bottom, full container width, 16px top corners.
-   Only one layer is active (data-active on .backdrop); the same pattern on phones and desktop. */
+   Front layer: "Resumen del pedido", breakdown, card and Pagar.
+   Both always visible. Phones: compact back layer on top, front layer as a sheet anchored at the
+   bottom (full container width, 16px top corners). Desktop: two columns, aligned at the top. */
 .app:has(.backdrop) {
   padding-bottom: 0;
 }
@@ -20,17 +21,13 @@
 .backdrop__back {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 .backdrop__product {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
-  transition: grid-template-columns 240ms var(--ease);
-}
-.backdrop[data-active='back'] .backdrop__product {
-  grid-template-columns: 112px minmax(0, 1fr);
 }
 .backdrop__media {
   overflow: hidden;
@@ -48,17 +45,18 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.backdrop__unit-price,
-.backdrop__quantity {
+.backdrop__unit-price {
   margin: 0;
   color: var(--color-muted);
   font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
 }
+/* Compact on phones: the description only shows on desktop. */
 .backdrop__description {
-  margin: 6px 0 0;
+  display: none;
+  margin: 8px 0 0;
   color: var(--color-muted);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 .backdrop__controls {
   display: flex;
@@ -66,7 +64,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  animation: layer-fade 200ms var(--ease);
 }
 .backdrop__controls .stepper {
   margin-top: 0;
@@ -79,11 +76,11 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   margin-top: auto;
   /* full width of the container: bleed over the .app side padding */
   margin-inline: calc(-1 * var(--space));
-  padding: 4px var(--space) calc(var(--space) + env(safe-area-inset-bottom));
+  padding: 20px var(--space) calc(var(--space) + env(safe-area-inset-bottom));
   border-radius: 16px 16px 0 0;
   background: var(--color-surface);
   box-shadow: 0 -8px 32px rgb(17 17 17 / 0.12);
@@ -93,62 +90,9 @@
   margin: 0;
   font-size: 1.125rem;
 }
-.backdrop__toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 56px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-.backdrop__toggle:disabled {
-  cursor: default;
-}
-.backdrop__toggle:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-.backdrop__toggle-label {
-  flex: 1;
-  min-width: 0;
-}
-.backdrop__toggle-total {
-  color: var(--color-muted);
-  font-size: 1rem;
-  font-variant-numeric: tabular-nums;
-}
-/* Chevron: down = lower the front layer, up = bring it back */
-.backdrop__chevron {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  margin: 0 6px 4px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
-  transition: transform 240ms var(--ease);
-}
-.backdrop[data-active='back'] .backdrop__chevron {
-  margin-bottom: -4px;
-  transform: rotate(-135deg);
-}
-.backdrop__front-body {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  animation: layer-fade 200ms var(--ease);
-}
-.backdrop__controls[hidden],
-.backdrop__front-body[hidden] {
-  display: none;
+/* Focus lands here programmatically on entry to announce the step; it is not a control. */
+.backdrop__subheader:focus {
+  outline: none;
 }
 .backdrop__pay {
   display: flex;
@@ -161,15 +105,6 @@
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   background: var(--color-surface-muted);
-}
-/* Soft scrim over the inactive front layer; tapping it brings the layer back. */
-.backdrop__scrim {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: rgb(17 17 17 / 0.06);
-  cursor: pointer;
-  animation: layer-fade 200ms var(--ease);
 }
 
 .breakdown {
@@ -257,49 +192,57 @@
     opacity: 0;
   }
 }
-@keyframes layer-fade {
-  from {
-    opacity: 0;
-  }
-}
-
-/* Desktop: same backdrop inside the centered 1080px container — no centered dialog. */
+/* Desktop: two columns inside the centered 1080px container, aligned at the top, no empty gap. */
 @media (min-width: 1024px) {
-  .backdrop__product {
-    grid-template-columns: 120px minmax(0, 1fr);
-    gap: 20px;
+  .app:has(.backdrop) {
+    padding-bottom: calc(var(--space) * 2);
   }
-  .backdrop[data-active='back'] .backdrop__product {
-    grid-template-columns: 200px minmax(0, 1fr);
+  .app__main[data-step='summary'] {
+    flex: none;
+  }
+  .backdrop {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+    gap: 32px;
+    align-items: start;
+    padding-top: 8px;
+  }
+  .backdrop__back {
+    gap: 24px;
+  }
+  .backdrop__product {
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
   }
   .backdrop__product-name {
-    font-size: 1.25rem;
+    font-size: 1.375rem;
+  }
+  .backdrop__unit-price {
+    font-size: 1rem;
+  }
+  .backdrop__description {
+    display: block;
   }
   .backdrop__controls {
     justify-content: flex-start;
     gap: 20px;
   }
   .backdrop__front {
-    padding: 8px 28px 28px;
+    position: static;
+    margin: 0;
+    padding: 24px 28px 28px;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgb(17 17 17 / 0.08);
   }
   .backdrop__subheader {
     font-size: 1.25rem;
   }
-  .backdrop__front-body {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 32px;
-    align-items: end;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .backdrop__front,
-  .backdrop__front-body,
-  .backdrop__controls,
-  .backdrop__scrim,
-  .backdrop__product,
-  .backdrop__chevron {
+  .backdrop__front {
     animation: none;
     transition: none;
   }

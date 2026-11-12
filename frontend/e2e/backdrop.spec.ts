@@ -21,83 +21,103 @@ async function toSummary(page: Page) {
   await continueToSummary(page);
 }
 
-const toggle = (page: Page) => page.getByRole('button', { name: /Resumen del pedido/ });
 const front = (page: Page) => page.locator('.backdrop__front');
+const back = (page: Page) => page.locator('.backdrop__back');
+const editButton = (page: Page) => page.getByRole('button', { name: 'Editar datos' });
+const plus = (page: Page) => page.getByRole('button', { name: 'Aumentar cantidad' });
 
-/** The front layer spans the whole container and sits on the bottom edge of the viewport. */
-async function expectFrontAnchored(page: Page) {
-  // measure the resting position, not a frame of the entry animation
-  await front(page).evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
-  const viewport = page.viewportSize()!;
-  const app = (await page.locator('.app').boundingBox())!;
-  const box = (await front(page).boundingBox())!;
-  expect(Math.round(box.x)).toBe(Math.round(app.x));
-  expect(Math.round(box.width)).toBe(Math.round(app.width));
-  expect(Math.round(box.y + box.height)).toBe(viewport.height);
-  const radius = await front(page).evaluate((el) => {
-    const css = getComputedStyle(el);
-    return [css.borderTopLeftRadius, css.borderTopRightRadius, css.borderBottomLeftRadius];
-  });
-  expect(radius).toEqual(['16px', '16px', '0px']);
-}
+/** Measure resting positions, not a frame of the entry animation. */
+const settle = (page: Page) =>
+  front(page).evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
 
-test.describe('Summary as a Material backdrop', () => {
-  test('AC-009-04 at 375×667 the front layer is anchored at the bottom, full width, and Pagar is visible without scrolling', async ({ page }) => {
+const noPageScroll = (page: Page) =>
+  page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight && window.scrollY === 0);
+
+test.describe('Summary in two fixed layers (ADR 0006)', () => {
+  test('AC-009-04 at 375×667 the back layer is compact on top and the front sheet is anchored at the bottom with Pagar visible without scrolling', async ({ page }) => {
     await toSummary(page);
+    await settle(page);
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expectFrontAnchored(page);
-    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    const viewport = page.viewportSize()!;
+    const app = (await page.locator('.app').boundingBox())!;
+    const backBox = (await back(page).boundingBox())!;
+    const box = (await front(page).boundingBox())!;
+    // back layer on top and compact, front layer below it, full width, on the bottom edge
+    expect(backBox.y + backBox.height).toBeLessThanOrEqual(box.y);
+    // compact: at most 30 % of the screen (font metrics differ per OS: ~150 px on macOS, ~164 px on Linux)
+    expect(backBox.height).toBeLessThanOrEqual(viewport.height * 0.3);
+    expect(Math.round(box.x)).toBe(Math.round(app.x));
+    expect(Math.round(box.width)).toBe(Math.round(app.width));
+    expect(Math.round(box.y + box.height)).toBe(viewport.height);
+    const radius = await front(page).evaluate((el) => {
+      const css = getComputedStyle(el);
+      return [css.borderTopLeftRadius, css.borderTopRightRadius, css.borderBottomLeftRadius];
+    });
+    expect(radius).toEqual(['16px', '16px', '0px']);
+    await expect(editButton(page)).toBeInViewport({ ratio: 1 });
+    await expect(plus(page)).toBeInViewport({ ratio: 1 });
     await expect(payButton(page)).toBeInViewport({ ratio: 1 });
-    expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
+    expect(await noPageScroll(page)).toBe(true);
     await expectNoHorizontalOverflow(page);
   });
 
-  test('AC-009-02 AC-009-03 the subheader swaps the active layer; Esc and the scrim bring the front layer back', async ({ page }) => {
+  test('AC-009-02 AC-009-03 both layers stay visible, without toggle or scrim; focus enters on the heading and Tab goes back controls → Pagar', async ({ page, browserName }) => {
+    // Safari/WebKit only tabs to buttons with Option+Tab (its default keyboard setting)
+    const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
     await toSummary(page);
-    await expect(toggle(page)).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByRole('button', { name: 'Editar datos' })).toBeHidden();
-
-    await toggle(page).click();
-    await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.getByRole('button', { name: 'Editar datos' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Aumentar cantidad' })).toBeFocused();
-    await expect(payButton(page)).toBeHidden();
-    await expect(page.locator('.backdrop__scrim')).toBeVisible();
-    await expectFrontAnchored(page);
-    await expectNoHorizontalOverflow(page);
-
-    await page.keyboard.press('Escape');
-    await expect(toggle(page)).toHaveAttribute('aria-expanded', 'true');
-    await expect(toggle(page)).toBeFocused();
-    await expect(payButton(page)).toBeInViewport({ ratio: 1 });
-
-    await toggle(page).click();
-    await page.locator('.backdrop__scrim').click();
+    const heading = page.getByRole('heading', { name: 'Resumen del pedido' });
+    await expect(heading).toBeFocused();
+    await expect(page.getByRole('region', { name: 'Resumen del pedido' })).toContainText('Tarifa base');
+    await expect(page.locator('[aria-expanded], .backdrop__scrim')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Resumen del pedido/ })).toHaveCount(0);
+    await expect(editButton(page)).toBeVisible();
     await expect(payButton(page)).toBeVisible();
+
+    await page.getByRole('heading', { name: 'Tienda Demo' }).click(); // start tabbing from the top
+    await page.keyboard.press(tab);
+    await expect(plus(page)).toBeFocused(); // − is disabled at quantity 1
+    await page.keyboard.press(tab);
+    await expect(editButton(page)).toBeFocused();
+    await page.keyboard.press(tab);
+    await expect(payButton(page)).toBeFocused();
   });
 
-  test('AC-009-02 changing the quantity in the back layer re-quotes the front layer', async ({ page }) => {
+  test('AC-009-02 changing the quantity re-quotes the front layer, both layers still on screen', async ({ page }) => {
     await toSummary(page);
     await expect(payButton(page)).toHaveText(/262\.900/);
-    await toggle(page).click();
-    await page.getByRole('button', { name: 'Aumentar cantidad' }).click();
-    await expect(toggle(page)).toContainText('512.800');
-    await page.keyboard.press('Escape');
+    await plus(page).click();
     await expect(payButton(page)).toHaveText(/512\.800/);
+    await expect(page.getByRole('group', { name: 'Cantidad' })).toContainText('Cantidad: 2');
+    await expect(payButton(page)).toBeInViewport({ ratio: 1 });
+    await expect(editButton(page)).toBeInViewport({ ratio: 1 });
   });
 
   test.describe('desktop', () => {
     test.use({ viewport: { width: 1280, height: 800 }, hasTouch: false });
 
-    test('AC-009-04 at 1280×800 the same backdrop lives in the centered container, without a centered dialog', async ({ page }) => {
+    test('AC-009-06 at 1280×800 the layers are two top-aligned columns in the centered container, without dialog or empty gap', async ({ page }) => {
       await toSummary(page);
+      await settle(page);
       await expect(page.getByRole('dialog')).toHaveCount(0);
       await expect(page.locator('.modal-overlay, .sheet-backdrop')).toHaveCount(0);
       const app = (await page.locator('.app').boundingBox())!;
       expect(Math.round(app.width)).toBe(1080);
       expect(Math.round(app.x)).toBe(100); // centered: (1280 − 1080) / 2
-      await expectFrontAnchored(page);
+      const backBox = (await back(page).boundingBox())!;
+      const box = (await front(page).boundingBox())!;
+      // side by side: back on the left, front on the right, both starting at the same height
+      expect(backBox.x + backBox.width).toBeLessThan(box.x);
+      expect(Math.round(backBox.y)).toBe(Math.round(box.y));
+      expect(box.x + box.width).toBeLessThanOrEqual(app.x + app.width);
+      // no empty gap: the front card is not pushed to the bottom of the viewport
+      const viewport = page.viewportSize()!;
+      expect(box.y + box.height).toBeLessThan(viewport.height - 100);
+      const radius = await front(page).evaluate((el) => getComputedStyle(el).borderBottomLeftRadius);
+      expect(radius).toBe('16px');
       await expect(payButton(page)).toBeInViewport({ ratio: 1 });
+      await expect(editButton(page)).toBeInViewport({ ratio: 1 });
+      await expect(page.getByText(HEADPHONES.description)).toBeVisible();
+      expect(await noPageScroll(page)).toBe(true);
       await expectNoHorizontalOverflow(page);
     });
   });
@@ -110,15 +130,14 @@ test.describe('Summary as a Material backdrop', () => {
       const motion = (selector: string) =>
         page.locator(selector).evaluate((el) => {
           const css = getComputedStyle(el);
-          return { animation: css.animationName, transition: css.transitionProperty };
+          return { animation: css.animationName, transition: css.transitionDuration };
         });
-      expect((await motion('.backdrop__front')).animation).toBe('none');
-      expect((await motion('.backdrop__front-body')).animation).toBe('none');
-      expect((await motion('.backdrop__chevron')).transition).toBe('none');
-      expect((await motion('.backdrop__product')).transition).toBe('none');
-      await toggle(page).click();
-      expect((await motion('.backdrop__controls')).animation).toBe('none');
-      expect((await motion('.backdrop__scrim')).animation).toBe('none');
+      for (const selector of ['.backdrop__front', '.backdrop__back', '.backdrop__product']) {
+        const m = await motion(selector);
+        expect(m.animation, selector).toBe('none');
+        // the global reduced-motion rule leaves at most 0.01 ms
+        for (const d of m.transition.split(',')) expect(parseFloat(d), selector).toBeLessThanOrEqual(0.00001);
+      }
     });
   });
 });

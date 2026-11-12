@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ApiError } from '../../shared/api/http';
 import { headphones, plain, quoteFor, summaryCheckout } from '../../test/fixtures';
 import { renderWithStore } from '../../test/renderWithStore';
+import { initialPaymentState } from './paymentSlice';
 import { SummaryBackdrop } from './SummaryBackdrop';
 
 jest.mock('../../shared/api/http', () => ({
@@ -26,7 +27,7 @@ describe('SummaryBackdrop', () => {
     getJson.mockResolvedValue(quoteFor(1));
     setup();
     expect(screen.getByRole('img', { name: headphones.name })).toBeInTheDocument();
-    expect(screen.getByText('Cantidad: 1', { selector: '.backdrop__quantity' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Cantidad' })).toHaveTextContent('Cantidad: 1');
     expect(await screen.findByText('Total')).toBeInTheDocument();
     expect(row('Subtotal')).toContain('$ 249.900');
     expect(row('Tarifa base')).toContain('$ 3.000');
@@ -60,12 +61,10 @@ describe('SummaryBackdrop', () => {
   });
 });
 
-const toggle = () => screen.getByRole('button', { name: /Resumen del pedido/ });
 const front = () => screen.getByRole('region', { name: 'Resumen del pedido' });
-const pay = () => screen.queryByRole('button', { name: /Pagar/ });
-const editButton = () => screen.queryByRole('button', { name: 'Editar datos' });
+const pay = () => screen.getByRole('button', { name: /^Pagar \$/ });
 
-describe('SummaryBackdrop layers (Material backdrop)', () => {
+describe('SummaryBackdrop layers (two fixed layers, ADR 0006)', () => {
   beforeEach(() => getJson.mockReset().mockResolvedValue(quoteFor(1)));
 
   it('AC-003-10 AC-009-01 back layer holds product, quantity and Editar datos; front layer holds breakdown, card and Pagar; no dialog', async () => {
@@ -78,86 +77,67 @@ describe('SummaryBackdrop layers (Material backdrop)', () => {
     expect(within(back).getByRole('img', { name: headphones.name })).toBeInTheDocument();
     expect(within(back).getByText(headphones.name)).toBeInTheDocument();
     expect(within(back).getByText('$ 249.900 c/u')).toBeInTheDocument();
-    expect(within(back).getByRole('group', { name: 'Cantidad', hidden: true })).toBeInTheDocument();
-    expect(within(back).getByRole('button', { name: 'Editar datos', hidden: true })).toBeInTheDocument();
+    expect(within(back).getByRole('group', { name: 'Cantidad' })).toBeVisible();
+    expect(within(back).getByRole('button', { name: 'Editar datos' })).toBeVisible();
 
-    expect(within(front()).getByRole('heading', { name: /Resumen del pedido/ })).toBeInTheDocument();
+    expect(within(front()).getByRole('heading', { name: 'Resumen del pedido' })).toBeInTheDocument();
     expect(within(front()).getByText('Tarifa base')).toBeInTheDocument();
     expect(within(front()).getByText('VISA •••• 4242')).toBeInTheDocument();
     expect(within(front()).getByRole('button', { name: /^Pagar \$/ })).toBeEnabled();
   });
 
-  it('AC-009-02 the front layer starts active; the subheader lowers it with a scrim and reveals the back controls', async () => {
+  it('AC-009-02 both layers stay visible: no collapse/expand toggle, no aria-expanded, no scrim, nothing hidden', async () => {
     const { container } = setup();
     await screen.findByText('Total');
-    expect(editButton()).toBeNull(); // back controls hidden while the front layer is active
-    expect(screen.queryByRole('group', { name: 'Cantidad' })).toBeNull();
-    expect(pay()).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resumen del pedido/ })).toBeNull();
+    expect(container.querySelector('[aria-expanded]')).toBeNull();
     expect(container.querySelector('.backdrop__scrim')).toBeNull();
-
-    await userEvent.click(toggle());
-    expect(editButton()).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Cantidad' })).toBeInTheDocument();
-    expect(pay()).toBeNull(); // only one active layer: the front content is hidden
-    expect(container.querySelector('.backdrop__scrim')).not.toBeNull();
-    expect(container.querySelector('.backdrop')).toHaveAttribute('data-active', 'back');
-
-    await userEvent.click(toggle());
-    expect(pay()).toBeInTheDocument();
-    expect(editButton()).toBeNull();
+    expect(container.querySelector('[hidden]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Editar datos' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Aumentar cantidad' })).toBeVisible();
+    expect(pay()).toBeVisible();
   });
 
-  it('AC-009-02 tapping the scrim brings the front layer back', async () => {
-    const { container } = setup();
-    await screen.findByText('Total');
-    await userEvent.click(toggle());
-    await userEvent.click(container.querySelector('.backdrop__scrim') as HTMLElement);
-    expect(pay()).toBeInTheDocument();
-    expect(container.querySelector('.backdrop')).toHaveAttribute('data-active', 'front');
-  });
-
-  it('AC-009-02 the subheader shows the total even when the front layer is lowered', async () => {
+  it('AC-009-02 changing the quantity re-quotes the front layer while both stay on screen', async () => {
+    getJson.mockReset().mockImplementation((url: string) => Promise.resolve(quoteFor(Number(/quantity=(\d+)/.exec(url)?.[1]))));
     setup();
     await screen.findByText('Total');
-    expect(toggle()).not.toHaveTextContent('$'); // the breakdown already shows the total
-    await userEvent.click(toggle());
-    expect(toggle()).toHaveTextContent('$ 262.900');
-    expect(screen.getByText(headphones.description)).toBeVisible();
+    expect(pay()).toHaveTextContent('262.900');
+    await userEvent.click(screen.getByRole('button', { name: 'Aumentar cantidad' }));
+    expect(await screen.findByRole('button', { name: /^Pagar .*512\.800/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Editar datos' })).toBeVisible();
   });
 
-  it('AC-009-03 aria-expanded/aria-controls follow the active layer, focus moves with it and Esc raises the front layer', async () => {
+  it('AC-009-03 focus enters on the "Resumen del pedido" heading, which names the front region', async () => {
     setup();
+    const heading = screen.getByRole('heading', { name: 'Resumen del pedido' });
+    expect(heading).toHaveFocus();
+    expect(heading).toHaveAttribute('tabindex', '-1');
+    expect(front()).toContainElement(heading);
     await screen.findByText('Total');
-    expect(toggle()).toHaveFocus();
-    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
-    const controls = (toggle().getAttribute('aria-controls') ?? '').split(' ');
-    expect(controls).toHaveLength(2);
-    for (const id of controls) expect(document.getElementById(id)).not.toBeNull();
-
-    await userEvent.click(toggle());
-    expect(toggle()).toHaveAttribute('aria-expanded', 'false');
-    // − is disabled at quantity 1, so focus lands on the first enabled back control
-    expect(screen.getByRole('button', { name: 'Aumentar cantidad' })).toHaveFocus();
-
-    await userEvent.keyboard('{Escape}');
-    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
-    expect(toggle()).toHaveFocus();
-    expect(pay()).toBeInTheDocument();
   });
 
-  it('AC-009-03 Esc does nothing while the front layer is already active', async () => {
-    const { store } = setup();
-    await screen.findByText('Total');
-    await userEvent.keyboard('{Escape}');
-    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
-    expect(store.getState().checkout.step).toBe('summary');
-  });
-
-  it('AC-009-03 the hidden layer is not focusable: tabbing from the toggle reaches Pagar, not the back controls', async () => {
+  it('AC-009-03 tab order follows the document: back controls (−/+, Editar datos) then Pagar', async () => {
     setup();
     await screen.findByRole('button', { name: /^Pagar \$/ });
-    toggle().focus();
+    (document.activeElement as HTMLElement).blur();
+    await userEvent.tab(); // − is disabled at quantity 1
+    expect(screen.getByRole('button', { name: 'Aumentar cantidad' })).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getByRole('button', { name: /^Pagar \$/ })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Editar datos' })).toHaveFocus();
+    await userEvent.tab();
+    expect(pay()).toHaveFocus();
+  });
+
+  it('AC-009-02 while paying, the quantity and Editar datos are disabled so the order cannot change', async () => {
+    renderWithStore(<SummaryBackdrop />, {
+      checkout: summaryCheckout({ quantity: 2 }),
+      products: { items: [headphones], status: 'succeeded', error: null },
+      payment: { ...initialPaymentState, status: 'paying', idempotencyKey: 'k1' },
+    });
+    expect(screen.getByRole('button', { name: 'Editar datos' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Aumentar cantidad' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Disminuir cantidad' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Procesando pago/ })).toBeDisabled();
   });
 });

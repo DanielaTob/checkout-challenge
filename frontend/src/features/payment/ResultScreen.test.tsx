@@ -1,5 +1,6 @@
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { emptyDelivery } from '../../shared/utils/delivery';
 import { initialCheckoutState } from '../checkout/checkoutSlice';
 import { aTransaction, headphones, plain, summaryCheckout } from '../../test/fixtures';
 import { renderWithStore } from '../../test/renderWithStore';
@@ -82,15 +83,43 @@ describe('ResultScreen', () => {
     expect(await screen.findByRole('heading', { name: '¡Pago aprobado!' })).toBeInTheDocument();
   });
 
-  it('AC-004-19 Volver a la tienda returns to the product screen, refetches stock and clears card and transaction', async () => {
+  it('AC-004-19 AC-011-01 after APPROVED, Volver a la tienda returns to the product screen, refetches stock and resets the whole checkout', async () => {
     getJson.mockResolvedValue([{ ...headphones, stock: 2 }]);
     const { store } = setup(aTransaction());
     await userEvent.click(screen.getByRole('button', { name: 'Volver a la tienda' }));
     const state = store.getState();
-    expect(state.checkout).toEqual({ ...initialCheckoutState, delivery: state.checkout.delivery });
+    // Delivery data, masked card, product, quantity and step: all back to the initial state.
+    expect(state.checkout).toEqual(initialCheckoutState);
+    expect(state.checkout.delivery).toEqual(emptyDelivery);
     expect(state.payment).toEqual(initialPaymentState);
     expect(state.cardSession).toBeNull();
     expect(getJson).toHaveBeenCalledWith('/products', expect.anything());
     await waitFor(() => expect(store.getState().products.items[0].stock).toBe(2));
   });
+
+  it.each(['DECLINED', 'ERROR'] as const)(
+    'AC-011-04 %s: Intentar de nuevo opens the modal with the delivery data and without the card or the old key',
+    async (status) => {
+      const { store } = setup(aTransaction({ status }));
+      await userEvent.click(screen.getByRole('button', { name: 'Intentar de nuevo' }));
+      const state = store.getState();
+      expect(state.checkout.step).toBe('details');
+      expect(state.checkout.delivery).toEqual(summaryCheckout().delivery);
+      expect(state.payment.idempotencyKey).toBeNull();
+      expect(state.payment.transaction).toBeNull();
+    },
+  );
+
+  it.each(['DECLINED', 'ERROR'] as const)(
+    'AC-011-05 %s: Volver a la tienda clears card and transaction but keeps the delivery data',
+    async (status) => {
+      getJson.mockResolvedValue([headphones]);
+      const { store } = setup(aTransaction({ status }));
+      await userEvent.click(screen.getByRole('button', { name: 'Volver a la tienda' }));
+      const state = store.getState();
+      expect(state.checkout).toEqual({ ...initialCheckoutState, delivery: summaryCheckout().delivery });
+      expect(state.payment).toEqual(initialPaymentState);
+      expect(state.cardSession).toBeNull();
+    },
+  );
 });

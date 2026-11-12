@@ -34,6 +34,8 @@ const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   !Array.isArray(v) &&
   !(v instanceof Error);
 
+const RESERVED_FIELDS = new Set(['timestamp', 'level', 'context', 'requestId']);
+
 const looksLikeStack = (v: string) => /\n\s+at /.test(v);
 
 export class JsonLogger implements LoggerService {
@@ -87,12 +89,20 @@ export class JsonLogger implements LoggerService {
       body = { message: String(message) };
     }
 
-    const entry = redact({
+    const reserved = {
       timestamp: this.now().toISOString(),
       level,
       ...(context ? { context } : {}),
       ...(requestId ? { requestId } : {}),
-      ...body,
+    };
+    // A logged object can never set the reserved fields of the line, whether or not they have
+    // a value here (no context, outside a request): they are dropped from the body.
+    const safeBody = Object.fromEntries(
+      Object.entries(body).filter(([k]) => !RESERVED_FIELDS.has(k)),
+    );
+    const entry = redact({
+      ...reserved,
+      ...safeBody,
       ...(stack ? { stack } : {}),
     });
     this.out(`${JSON.stringify(entry)}\n`);

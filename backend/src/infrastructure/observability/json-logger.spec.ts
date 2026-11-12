@@ -78,6 +78,45 @@ describe('JsonLogger (spec 010)', () => {
     expect(c).not.toHaveProperty('message');
   });
 
+  it('AC-010-05 a logged object cannot overwrite timestamp, level, context or requestId', () => {
+    const { logger, json } = make();
+    requestContext.run({ requestId: 'req-real' }, () =>
+      logger.warn(
+        {
+          event: 'x',
+          timestamp: 'fake',
+          level: 'debug',
+          context: 'Fake',
+          requestId: 'req-fake',
+        },
+        'Real',
+      ),
+    );
+    expect(json()[0]).toEqual({
+      timestamp: '2026-11-11T12:00:00.000Z',
+      level: 'warn',
+      context: 'Real',
+      requestId: 'req-real',
+      event: 'x',
+    });
+    expect(Object.keys(json()[0]).slice(0, 4)).toEqual([
+      'timestamp',
+      'level',
+      'context',
+      'requestId',
+    ]);
+  });
+
+  it('AC-010-05 without a context and outside a request, a logged object still cannot set context or requestId', () => {
+    const { logger, json } = make();
+    logger.log({ event: 'y', context: 'Fake', requestId: 'req-fake' });
+    expect(json()[0]).toEqual({
+      timestamp: '2026-11-11T12:00:00.000Z',
+      level: 'info',
+      event: 'y',
+    });
+  });
+
   it('AC-010-05 adds the requestId of the current request and none outside a request', () => {
     const { logger, json } = make();
     logger.log('boot');

@@ -12,7 +12,7 @@
 | [008-headers-seguridad](008-headers-seguridad/spec.md) | COOP, CORP y Permissions-Policy en CloudFront tras el HTTP Observatory | Implementada |
 | [009-backdrop-resumen](009-backdrop-resumen/spec.md) | Paso Resumen en dos capas fijas (trasera con cantidad y Editar datos, delantera con resumen y Pagar), móvil y desktop | Implementada |
 | [010-observabilidad](010-observabilidad/spec.md) | Logs JSON con requestId, eventos de pago, dashboard, alarmas y X-Ray | Implementada |
-| [011-limpieza-tras-compra](011-limpieza-tras-compra/spec.md) | Borrar entrega y progreso tras una compra aprobada; conservar la entrega tras un rechazo | En curso |
+| [011-limpieza-tras-compra](011-limpieza-tras-compra/spec.md) | Borrar entrega y progreso tras una compra aprobada; conservar la entrega tras un rechazo | Implementada |
 
 ## Contrato de API (visión global)
 

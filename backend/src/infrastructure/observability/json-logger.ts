@@ -87,13 +87,19 @@ export class JsonLogger implements LoggerService {
       body = { message: String(message) };
     }
 
-    const entry = redact({
+    const reserved = {
       timestamp: this.now().toISOString(),
       level,
       ...(context ? { context } : {}),
       ...(requestId ? { requestId } : {}),
+    };
+    // Reserved fields go first (readable order) and again last, so a logged object can never
+    // overwrite the timestamp, level, context or requestId of the line.
+    const entry = redact({
+      ...reserved,
       ...body,
       ...(stack ? { stack } : {}),
+      ...reserved,
     });
     this.out(`${JSON.stringify(entry)}\n`);
   }

@@ -26,7 +26,7 @@ Poder responder en producción "¿qué pasó con esta petición?" y "¿cómo va 
 - **AC-010-07** — Dado un log que, por error, incluye un número de tarjeta (13–19 dígitos seguidos) en el mensaje o un campo llamado `number`, `cardNumber`, `pan`, `cvc` o `cvv`, cuando se escribe, entonces el valor aparece como `[REDACTED]`.
 
 ### Backend: eventos de negocio
-- **AC-010-08** — Dada una transacción PENDING, cuando pasa a un estado final (APPROVED, DECLINED, VOIDED o ERROR, incluido el ERROR por fallo de la pasarela y el ERROR por falta de stock en la carrera), entonces se escribe una línea `{"event":"payment.finalized"}` con `reference`, `status`, `amountInCents` y `cardBrand`, sin email, nombre, dirección ni datos de la tarjeta.
+- **AC-010-08** — Dada una transacción PENDING, cuando pasa a un estado final (APPROVED, DECLINED o ERROR, incluido el ERROR por fallo de la pasarela y el ERROR por falta de stock en la carrera), entonces se escribe una línea `{"event":"payment.finalized"}` con `reference`, `status`, `amountInCents` y `cardBrand`, sin email, nombre, dirección ni datos de la tarjeta.
 - **AC-010-09** — Dada una transacción que ya está en estado final, cuando se reconsulta (`GET /transactions/:id`, `GET /transactions/by-key/:key` o un replay con la misma Idempotency-Key), entonces no se emite otro `payment.finalized`.
 - **AC-010-10** — Dada la API, cuando el navegador hace una petición CORS desde un origen permitido, entonces la respuesta incluye `Access-Control-Expose-Headers` con `x-request-id`.
 

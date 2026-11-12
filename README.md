@@ -9,7 +9,7 @@ Checkout móvil de un producto pagado con tarjeta de crédito a través de una p
 | | URL |
 |---|---|
 | **App (front)** | <https://d3uvn5ovkcpvxw.cloudfront.net> |
-| **API** | <https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com> |
+| **API** | <https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com/health> |
 | **Swagger** | <https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com/docs> |
 | **Health** | <https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com/health> |
 | **Postman** | [`docs/postman.json`](docs/postman.json) |
@@ -423,7 +423,7 @@ En la CI, el job **`e2e`** corre en paralelo con `verify` en cada PR y push a `d
 
 > Los E2E encontraron un bug que los tests de Jest no veían: Firefox y Safari cortan el `fetch` en vuelo al recargar, el pago se guardaba como fallido y, al volver, la app pedía la tarjeta en vez de recuperar el pago. Ahora también se busca por `Idempotency-Key` en ese caso (AC-005-05).
 
-### Trazabilidad: 114/114 criterios con test
+### Trazabilidad: 111/111 criterios con test
 
 Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un test con ese ID en el nombre (`it('AC-004-12 …')`). [`scripts/trace.ts`](scripts/trace.ts) arma la matriz y falla si falta alguno; la CI la corre con `--shipped`.
 
@@ -440,7 +440,7 @@ Cada criterio de aceptación `AC-NNN-YY` de `specs/*/spec.md` tiene al menos un 
 | [009 · resumen en dos capas](specs/009-backdrop-resumen/spec.md) | paso Resumen en dos capas fijas (móvil y desktop), accesibilidad y reduced motion | 6 | ✅ 6 |
 | [010 · observabilidad](specs/010-observabilidad/spec.md) | logs JSON con requestId, evento `payment.finalized`, dashboard, alarmas y X-Ray | 14 | ✅ 14 |
 | [011 · limpieza tras la compra](specs/011-limpieza-tras-compra/spec.md) | borrar entrega y progreso tras APPROVED; conservar la entrega tras DECLINED/ERROR | 5 | ✅ 5 |
-| **Total** | | **114** | **✅ 114/114** |
+| **Total** | | **111** | **✅ 111/111** |
 
 ```bash
 npx tsx scripts/trace.ts             # matriz completa (todas las specs)
@@ -505,12 +505,9 @@ npx tsx scripts/trace.ts --spec 004  # una spec
 | AC-004-20 | frontend/src/features/payment/paymentSlice.test.ts | ✅ |
 | AC-004-21 | backend/src/application/transactions/create-transaction.use-case.spec.ts<br>backend/src/infrastructure/prisma/prisma-transaction.repository.spec.ts | ✅ |
 | AC-005-01 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
-| AC-005-01 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
 | AC-005-02 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
 | AC-005-03 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
 | AC-005-04 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
-| AC-005-04 | frontend/src/app/resumeAfterReload.test.tsx | ✅ |
-| AC-005-05 | frontend/src/app/recoverPayment.test.tsx | ✅ |
 | AC-005-05 | frontend/src/app/recoverPayment.test.tsx | ✅ |
 | AC-005-06 | frontend/src/app/noCardLeak.test.tsx | ✅ |
 | AC-005-07 | frontend/src/app/persistence.test.ts | ✅ |

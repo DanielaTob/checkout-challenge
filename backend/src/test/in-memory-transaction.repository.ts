@@ -8,13 +8,21 @@ import {
   type Transaction,
   type TransactionOutcome,
 } from '../domain/transaction/transaction';
-import type { TransactionRepository } from '../domain/transaction/transaction.repository';
+import type {
+  AppliedOutcome,
+  TransactionRepository,
+} from '../domain/transaction/transaction.repository';
 import type { InMemoryProductRepository } from './in-memory-product.repository';
 
 /**
  * Test double with the same semantics as the Prisma adapter: stock checked at creation,
  * atomic + idempotent applyResult.
  */
+const claimed = (transaction: Transaction): AppliedOutcome => ({
+  transaction,
+  claimed: true,
+});
+
 export class InMemoryTransactionRepository implements TransactionRepository {
   readonly rows: Transaction[] = [];
   readonly log: string[] = [];
@@ -75,29 +83,37 @@ export class InMemoryTransactionRepository implements TransactionRepository {
     return Promise.resolve(this.update(id, { gatewayTransactionId }));
   }
 
-  applyResult(id: string, outcome: TransactionOutcome): Promise<Transaction> {
+  applyResult(
+    id: string,
+    outcome: TransactionOutcome,
+  ): Promise<AppliedOutcome> {
     this.log.push(`applyResult:${outcome.status}`);
     const current = this.rows.find((r) => r.id === id)!;
-    if (current.status !== 'PENDING') return Promise.resolve(current);
+    if (current.status !== 'PENDING')
+      return Promise.resolve({ transaction: current, claimed: false });
     const gatewayTransactionId =
       outcome.gatewayTransactionId ?? current.gatewayTransactionId;
     if (outcome.status !== 'APPROVED') {
       return Promise.resolve(
-        this.update(id, {
-          status: outcome.status,
-          failureReason: outcome.failureReason,
-          gatewayTransactionId,
-        }),
+        claimed(
+          this.update(id, {
+            status: outcome.status,
+            failureReason: outcome.failureReason,
+            gatewayTransactionId,
+          }),
+        ),
       );
     }
     const stock = this.products.stockOf(current.productId)!;
     if (stock < current.quantity) {
       return Promise.resolve(
-        this.update(id, {
-          status: 'ERROR',
-          failureReason: OUT_OF_STOCK_AFTER_PAYMENT,
-          gatewayTransactionId,
-        }),
+        claimed(
+          this.update(id, {
+            status: 'ERROR',
+            failureReason: OUT_OF_STOCK_AFTER_PAYMENT,
+            gatewayTransactionId,
+          }),
+        ),
       );
     }
     this.products.setStock(current.productId, stock - current.quantity);
@@ -109,12 +125,14 @@ export class InMemoryTransactionRepository implements TransactionRepository {
       status: 'PENDING',
     };
     return Promise.resolve(
-      this.update(id, {
-        status: 'APPROVED',
-        failureReason: null,
-        gatewayTransactionId,
-        delivery,
-      }),
+      claimed(
+        this.update(id, {
+          status: 'APPROVED',
+          failureReason: null,
+          gatewayTransactionId,
+          delivery,
+        }),
+      ),
     );
   }
 

@@ -29,9 +29,14 @@ import {
   TRANSACTION_REPOSITORY,
   type TransactionRepository,
 } from '../domain/transaction/transaction.repository';
+import {
+  PAYMENT_EVENTS,
+  type PaymentEvents,
+} from '../domain/transaction/payment-events';
 import { CustomersModule } from './customers.module';
 import { gatewayConfigFrom } from './gateway/gateway-config';
 import { HttpPaymentGateway } from './gateway/http-payment-gateway';
+import { LogPaymentEvents } from './observability/log-payment-events';
 import { DeliveriesController } from './http/deliveries.controller';
 import { TransactionsController } from './http/transactions.controller';
 import { PrismaDeliveryRepository } from './prisma/prisma-delivery.repository';
@@ -63,11 +68,12 @@ import { ProductsModule } from './products.module';
         new PollTransactionStatus(gateway, clock),
       inject: [PAYMENT_GATEWAY, CLOCK],
     },
+    { provide: PAYMENT_EVENTS, useValue: new LogPaymentEvents() },
     {
       provide: ApplyTransactionResult,
-      useFactory: (repo: TransactionRepository) =>
-        new ApplyTransactionResult(repo),
-      inject: [TRANSACTION_REPOSITORY],
+      useFactory: (repo: TransactionRepository, events: PaymentEvents) =>
+        new ApplyTransactionResult(repo, events),
+      inject: [TRANSACTION_REPOSITORY, PAYMENT_EVENTS],
     },
     {
       provide: RefreshTransaction,
@@ -87,6 +93,7 @@ import { ProductsModule } from './products.module';
         poll: PollTransactionStatus,
         apply: ApplyTransactionResult,
         refresh: RefreshTransaction,
+        events: PaymentEvents,
       ) =>
         new CreateTransaction({
           products,
@@ -98,6 +105,7 @@ import { ProductsModule } from './products.module';
           poll,
           apply,
           refresh,
+          events,
         }),
       inject: [
         PRODUCT_REPOSITORY,
@@ -109,6 +117,7 @@ import { ProductsModule } from './products.module';
         PollTransactionStatus,
         ApplyTransactionResult,
         RefreshTransaction,
+        PAYMENT_EVENTS,
       ],
     },
     {

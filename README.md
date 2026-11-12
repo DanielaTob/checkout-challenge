@@ -2,6 +2,10 @@
 
 Checkout móvil de un producto pagado con tarjeta de crédito a través de una pasarela de pago en modo **sandbox** (sin dinero real): producto → tarjeta y entrega → resumen → resultado → vuelta al producto con el stock actualizado. Si el usuario recarga, la app retoma el paso en el que iba.
 
+## Probar la app (guía rápida para el evaluador)
+
+### URLs
+
 | | URL |
 |---|---|
 | **App (front)** | <https://d3uvn5ovkcpvxw.cloudfront.net> |
@@ -10,6 +14,40 @@ Checkout móvil de un producto pagado con tarjeta de crédito a través de una p
 | **Health** | <https://nzeeql7sb7.execute-api.us-east-2.amazonaws.com/health> |
 | **Postman** | [`docs/postman.json`](docs/postman.json) |
 
+### Tarjetas de prueba
+
+La pasarela está en modo **sandbox**: no se mueve dinero real. Todas las tarjetas usan el vencimiento **12/29**, el CVC **123** y el nombre **ANA PEREZ**.
+
+| Número | Resultado |
+|---|---|
+| `4242 4242 4242 4242` | Pago **aprobado**: el stock baja en 1 (se ve al volver a la tienda) |
+| `4111 1111 1111 1111` | Pago **rechazado**: el stock no cambia y la entrega se conserva para **Intentar de nuevo** |
+| `5555 5555 5555 4444` | Solo para ver el logo de **MasterCard** en el campo del número |
+
+### Casos de validación
+
+Escribe uno de estos valores y sal del campo para ver el error. Mientras haya un error, **Continuar** está deshabilitado.
+
+| Campo | Valor | Mensaje |
+|---|---|---|
+| Número de tarjeta | `1234 5678 9012 3456` | «Solo aceptamos VISA o MasterCard» |
+| Vencimiento (MM/AA) | `01/20` | «Fecha inválida o vencida» |
+| CVC | `12` | «El CVC tiene 3 dígitos» |
+
+### Datos de entrega de ejemplo
+
+| Campo | Valor |
+|---|---|
+| Nombre completo | Ana Pérez |
+| Email | ana@example.com |
+| Teléfono | 3001234567 |
+| Dirección | Calle 1 # 2-3 |
+| Ciudad | Bogotá |
+| Departamento | Cundinamarca |
+| Código postal | 110111 |
+
+## Stack y seguridad
+
 - **Frontend**: React + TypeScript (Vite), Redux Toolkit + redux-persist, CSS mobile-first (desde iPhone SE 375×667).
 - **Backend**: NestJS + TypeScript, arquitectura hexagonal (puertos y adaptadores) y Railway Oriented Programming.
 - **Base de datos**: PostgreSQL serverless (Neon) con Prisma, conexión SSL.
@@ -17,10 +55,10 @@ Checkout móvil de un producto pagado con tarjeta de crédito a través de una p
 - **Seguridad**: HTTPS en ambos extremos; CloudFront agrega HSTS (`max-age=63072000; preload`), CSP `default-src 'self'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Cross-Origin-Opener-Policy` y `Cross-Origin-Resource-Policy` (`same-origin`) y una `Permissions-Policy` que apaga cámara, micrófono, geolocalización, USB y Payment Request; la API usa `helmet`, CORS restringido al dominio del front y validación estricta de DTOs (`whitelist` + `forbidNonWhitelisted`). La tarjeta se tokeniza en la pasarela: el número y el CVC nunca se guardan, ni se loguean, ni llegan a `localStorage` (hay tests que lo prueban).
 - **[HTTP Observatory de MDN](https://developer.mozilla.org/en-US/observatory/analyze?host=d3uvn5ovkcpvxw.cloudfront.net)** (escaneo del front del **2026-11-11**, con v1.0.1 desplegada): **A+ · 135/100 · 12/12 tests superados**. Con v1.0.0 sacaba A+ · 115/100: el informe marcaba COOP, CORP y COEP como no implementados, y v1.0.1 agregó COOP, CORP y `Permissions-Policy` ([spec 008](specs/008-headers-seguridad/spec.md)). COEP (`require-corp`) se deja fuera a propósito: solo sirve para aislar el origen (`SharedArrayBuffer`), que la app no usa.
 
-**Tarjetas del sandbox**: `4242 4242 4242 4242` → aprobada · `4111 1111 1111 1111` → rechazada (cualquier CVC de 3 dígitos y fecha futura).
-
 ## Contenido
 
+- [Probar la app](#probar-la-app-guía-rápida-para-el-evaluador)
+- [Stack y seguridad](#stack-y-seguridad)
 - [Diseño](#diseño)
 - [Arquitectura](#arquitectura)
 - [Flujo de pago](#flujo-de-pago)

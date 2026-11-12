@@ -30,13 +30,17 @@ export const requestLogging = (
     logged = true;
     const durationMs =
       Math.round(Number(process.hrtime.bigint() - started) / 1e5) / 10;
-    const statusCode = res.statusCode;
+    // The client closed the connection before the response finished: res.statusCode would be
+    // the default 200, so log 499 (client closed request) and flag it.
+    const aborted = !res.writableFinished;
+    const statusCode = aborted ? 499 : res.statusCode;
     const entry = {
       event: 'http.request',
       method: req.method,
       path: (req.originalUrl ?? req.url).split('?')[0],
       statusCode,
       durationMs,
+      ...(aborted ? { aborted: true } : {}),
     };
     requestContext.run({ requestId }, () => {
       if (statusCode >= 500) logger.error(entry);

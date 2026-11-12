@@ -5,10 +5,11 @@
 export const REDACTED = '[REDACTED]';
 
 const SENSITIVE_KEY = /^(number|card_?number|pan|cvc|cvv2?)$/i;
-// 13–19 consecutive digits, or 4-digit groups separated by spaces/dashes (how card numbers are
-// written). Not any dash-separated digits: UUIDs such as 0000-4000-8000-000000000001 must survive.
+// 13–19 consecutive digits, 4-digit groups (Visa/Mastercard) or Amex 4-6-5, separated by spaces
+// or dashes (how card numbers are written). Not any dash-separated digits: UUIDs such as
+// 0000-4000-8000-000000000001 must survive. Trade-off: a 13–19 digit numeric id is redacted too.
 const CARD_NUMBER =
-  /\b(?:\d{13,19}|\d{4}(?:[ -]\d{4}){2}[ -]\d{4}(?:[ -]?\d{1,3})?)\b/g;
+  /\b(?:\d{13,19}|\d{4}(?:[ -]\d{4}){2}[ -]\d{4}(?:[ -]?\d{1,3})?|\d{4}[ -]\d{6}[ -]\d{5})\b/g;
 
 export const redactText = (text: string): string =>
   text.replace(CARD_NUMBER, REDACTED);

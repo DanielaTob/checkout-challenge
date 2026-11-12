@@ -21,6 +21,7 @@ import { andThenAsync, err, ok, type Result } from '../../domain/shared/result';
 import type { Transaction } from '../../domain/transaction/transaction';
 import type { TransactionRepository } from '../../domain/transaction/transaction.repository';
 import type { ApplyTransactionResult } from './apply-transaction-result.use-case';
+import type { PaymentEvents } from '../../domain/transaction/payment-events';
 import type { PollTransactionStatus } from './poll-transaction-status.use-case';
 import type { RefreshTransaction } from './refresh-transaction.use-case';
 
@@ -50,6 +51,8 @@ export interface CreateTransactionDeps {
   readonly poll: PollTransactionStatus;
   readonly apply: ApplyTransactionResult;
   readonly refresh: RefreshTransaction;
+  /** Business events (spec 010); the gateway-failure ERROR is reported here. */
+  readonly events?: PaymentEvents;
   readonly newReference?: () => string;
   /** Total time for the payment request; defaults to PAYMENT_TIME_BUDGET_MS. */
   readonly budgetMs?: number;
@@ -129,11 +132,12 @@ export class CreateTransaction {
       deadline,
     );
     if (!paid.ok) {
-      await transactions.applyResult(pending.value.id, {
+      const failed = await transactions.applyResult(pending.value.id, {
         status: 'ERROR',
         gatewayTransactionId: null,
         failureReason: paid.error.message,
       });
+      if (failed.claimed) this.deps.events?.finalized(failed.transaction);
       return paid;
     }
     return ok({ transaction: paid.value, created: true });

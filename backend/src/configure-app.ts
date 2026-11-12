@@ -1,6 +1,11 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { JsonLogger } from './infrastructure/observability/json-logger';
+import {
+  REQUEST_ID_HEADER,
+  requestLogging,
+} from './infrastructure/observability/request-logging.middleware';
 
 export const parseOrigins = (raw: string | undefined): string[] =>
   (raw ?? '')
@@ -13,10 +18,15 @@ export const configureApp = (
   app: INestApplication,
   corsOrigins: string | undefined,
 ): void => {
+  // Spec 010: JSON logs to stdout (LOG_LEVEL), request id + access log for every request
+  // (registered first so CORS preflights are logged too).
+  app.useLogger(new JsonLogger({ level: process.env.LOG_LEVEL }));
+  app.use(requestLogging);
   app.use(helmet());
   app.enableCors({
     origin: parseOrigins(corsOrigins),
     methods: ['GET', 'POST', 'PATCH'],
+    exposedHeaders: [REQUEST_ID_HEADER],
   });
   app.useGlobalPipes(
     new ValidationPipe({

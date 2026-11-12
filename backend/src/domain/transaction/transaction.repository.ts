@@ -6,6 +6,12 @@ import type {
   TransactionOutcome,
 } from './transaction';
 
+/** Result of applyResult: `claimed` is true only for the call that moved the row out of PENDING. */
+export interface AppliedOutcome {
+  readonly transaction: Transaction;
+  readonly claimed: boolean;
+}
+
 export interface TransactionRepository {
   /**
    * In one DB transaction with the product row locked (SELECT … FOR UPDATE): if the
@@ -22,9 +28,10 @@ export interface TransactionRepository {
   /**
    * Atomic and idempotent: only a PENDING transaction changes. APPROVED decrements the
    * stock (never below 0) and creates the delivery; if the stock ran out meanwhile the
-   * transaction ends in ERROR with OUT_OF_STOCK_AFTER_PAYMENT. Applying twice is a no-op.
+   * transaction ends in ERROR with OUT_OF_STOCK_AFTER_PAYMENT. Applying twice is a no-op
+   * (`claimed: false`), so callers can emit side effects exactly once.
    */
-  applyResult(id: string, outcome: TransactionOutcome): Promise<Transaction>;
+  applyResult(id: string, outcome: TransactionOutcome): Promise<AppliedOutcome>;
 }
 
 export const TRANSACTION_REPOSITORY = Symbol('TransactionRepository');

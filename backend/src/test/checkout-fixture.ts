@@ -1,3 +1,5 @@
+import type { PaymentEvents } from '../domain/transaction/payment-events';
+import type { Transaction } from '../domain/transaction/transaction';
 import { ApplyTransactionResult } from '../application/transactions/apply-transaction-result.use-case';
 import { CreateTransaction } from '../application/transactions/create-transaction.use-case';
 import { PollTransactionStatus } from '../application/transactions/poll-transaction-status.use-case';
@@ -51,7 +53,10 @@ export const checkoutFixture = (stock = 5) => {
   const clock = new FakeClock();
   const fees = { getFees: () => FEES };
   const poll = new PollTransactionStatus(gateway, clock);
-  const apply = new ApplyTransactionResult(transactions);
+  /** PaymentEvents recorder (spec 010). */
+  const finalized: Transaction[] = [];
+  const events: PaymentEvents = { finalized: (t) => void finalized.push(t) };
+  const apply = new ApplyTransactionResult(transactions, events);
   const refresh = new RefreshTransaction(gateway, apply);
   let seq = 0;
   const createTransaction = new CreateTransaction({
@@ -64,6 +69,7 @@ export const checkoutFixture = (stock = 5) => {
     poll,
     apply,
     refresh,
+    events,
     newReference: () => `TX-${++seq}`,
   });
   return {
@@ -79,5 +85,6 @@ export const checkoutFixture = (stock = 5) => {
     apply,
     refresh,
     createTransaction,
+    finalized,
   };
 };

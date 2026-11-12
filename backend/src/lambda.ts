@@ -9,7 +9,7 @@ import { configureApp } from './configure-app';
 let cached: Handler | undefined;
 
 const bootstrap = async (): Promise<Handler> => {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
   configureApp(app, process.env.CORS_ORIGINS);
   await app.init();
   return serverlessExpress({

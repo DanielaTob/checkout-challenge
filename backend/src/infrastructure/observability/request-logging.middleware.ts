@@ -25,14 +25,15 @@ export const requestLogging = (
   const started = process.hrtime.bigint();
   let logged = false;
 
-  const done = () => {
+  const done = (finished: boolean) => {
     if (logged) return;
     logged = true;
     const durationMs =
       Math.round(Number(process.hrtime.bigint() - started) / 1e5) / 10;
-    // The client closed the connection before the response finished: res.statusCode would be
-    // the default 200, so log 499 (client closed request) and flag it.
-    const aborted = !res.writableFinished;
+    // The client closed the connection before the app ended the response: res.statusCode would
+    // be the default 200, so log 499 (client closed request) and flag it. Not writableFinished:
+    // on Lambda the serverless-express response has a fake socket and it never becomes true.
+    const aborted = !finished && !res.writableEnded;
     const statusCode = aborted ? 499 : res.statusCode;
     const entry = {
       event: 'http.request',
@@ -48,8 +49,8 @@ export const requestLogging = (
       else logger.log(entry);
     });
   };
-  res.on('finish', done);
-  res.on('close', done);
+  res.on('finish', () => done(true));
+  res.on('close', () => done(false));
 
   requestContext.run({ requestId }, () => next());
 };

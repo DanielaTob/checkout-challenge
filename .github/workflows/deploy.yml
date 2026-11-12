@@ -1,0 +1,76 @@
+name: Deploy
+
+# CD to production. Called by CI (.github/workflows/ci.yml, job `deploy`) after every push to
+# `main` once all CI stages are green; can also be run by hand on `main` (workflow_dispatch).
+# AWS access: the dedicated IAM user `checkout-ci-deployer` (infra/ci-deployer.yaml, least
+# privilege). OIDC was the first choice but the account SCP denies creating the OIDC provider
+# (docs/adr/0005). Its access keys and the backend config live only as secrets of the
+# `production` environment, which only allows `main`.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Defence in depth: the `production` environment also only allows `main`.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.web_url }}
+    env:
+      AWS_REGION: us-east-2
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/setup
+        with: { packages: backend frontend }
+
+      - name: AWS credentials (checkout-ci-deployer)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Deploy (scripts/deploy.sh)
+        id: deploy
+        env:
+          CFN_EXEC_ROLE_ARN: ${{ vars.CFN_EXEC_ROLE_ARN }}
+          SMOKE_TEST: '0'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          GATEWAY_BASE_URL: ${{ secrets.GATEWAY_BASE_URL }}
+          GATEWAY_PUBLIC_KEY: ${{ secrets.GATEWAY_PUBLIC_KEY }}
+          GATEWAY_PRIVATE_KEY: ${{ secrets.GATEWAY_PRIVATE_KEY }}
+          GATEWAY_INTEGRITY_SECRET: ${{ secrets.GATEWAY_INTEGRITY_SECRET }}
+          GATEWAY_EVENTS_SECRET: ${{ secrets.GATEWAY_EVENTS_SECRET }}
+          BASE_FEE_IN_CENTS: ${{ secrets.BASE_FEE_IN_CENTS }}
+          DELIVERY_FEE_IN_CENTS: ${{ secrets.DELIVERY_FEE_IN_CENTS }}
+        run: scripts/deploy.sh
+
+      - name: Smoke test (/health + SPA renders against this API)
+        env:
+          API_URL: ${{ steps.deploy.outputs.api_url }}
+          WEB_URL: ${{ steps.deploy.outputs.web_url }}
+        run: scripts/smoke-test.sh "$API_URL" "$WEB_URL"
+
+      - name: Summary
+        env:
+          API_URL: ${{ steps.deploy.outputs.api_url }}
+          WEB_URL: ${{ steps.deploy.outputs.web_url }}
+        run: |
+          {
+            echo "## Despliegue"
+            echo "- Commit: \`${GITHUB_SHA::7}\`"
+            echo "- Front: $WEB_URL"
+            echo "- API: $API_URL (Swagger: /docs)"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -31,4 +31,6 @@ Termina con código distinto de 0 si algo falla y lista los pasos fallidos al fi
 - **Prohibido**: desactivar o saltar pasos, bajar umbrales de cobertura, debilitar tests, `git commit --no-verify` o excluir archivos de la cobertura para que pase.
 
 ## Variante rápida
+`scripts/verify.sh <sección>…` corre solo esas secciones (`lint`, `typecheck`, `test-backend`, `test-frontend`, `build`, `security`); cada etapa de la CI usa una, así que para reproducir un job rojo corre su sección.
+
 `VERIFY_FAST=1 scripts/verify.sh` omite builds y `npm audit`. La usa el hook de pre-commit de Husky; no reemplaza la verificación completa antes de un PR.

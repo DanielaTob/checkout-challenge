@@ -79,10 +79,12 @@ GitFlow ligero. **Nunca hagas `git push` sin que la persona lo pida.**
 | `feat/NNN-nombre` | Una spec (flujo `ship`) | `develop` | `develop` vía PR |
 | `hotfix/descripcion` | Arreglo urgente en producción | `main` | `main` **y** `develop` |
 
+- **Revisión con IA obligatoria:** cada PR a `develop` o `main` lo revisa automáticamente la IA (`.github/workflows/ai-review.yml`, Action oficial de Claude Code) contra esta guía y la spec enlazada. **No se mergea un PR sin esa revisión y sin atender o responder cada uno de sus comentarios** (arreglo en un commit nuevo o respuesta justificada en el hilo). Los PR ya mergeados no se revisan a posteriori. Cada push genera una revisión nueva; vale el último resumen (lleva el SHA revisado). `develop` y `main` están protegidas: exigen en verde los checks `review`, `lint`, `typecheck`, `test-backend`, `test-frontend`, `build`, `e2e`, `security` y `trace`, sin aprobación humana. Atender los comentarios de la IA sigue siendo responsabilidad de quien mergea. El bypass de admin es solo para emergencias.
 - Los PR se integran con **merge commit** (`gh pr merge --merge`), nunca `--squash`, para conservar el historial por tarea.
 - **Release**: PR `develop → main`; tras el merge, tag anotado en `main` (`git tag -a v0.1.0 -m "…"`): `v0.1.0` = esqueleto desplegado, `v1.0.0` = entrega final.
 - **Hotfix**: `git checkout -b hotfix/x main` → PR a `main` → tag de parche (`v1.0.1`) → PR (o merge) de `main` a `develop`.
-- La CI (`.github/workflows/ci.yml`) corre en los PR y pushes hacia `develop` y `main`.
+- **CD:** cada push a `main` con todas las etapas de la CI en verde dispara el job `deploy` (`.github/workflows/deploy.yml`, environment `production`, solo `main`). Se autentica con el usuario IAM dedicado `checkout-ci-deployer` (`infra/ci-deployer.yaml`, mínimo privilegio; sus llaves solo están como secretos del environment y se rotan cada 90 días, ver ADR 0005), ejecuta `scripts/deploy.sh` y hace smoke test. No despliegues a mano salvo emergencia.
+- La CI (`.github/workflows/ci.yml`) corre en los PR y pushes hacia `develop` y `main`, por etapas: `lint` + `typecheck` → `test-backend` + `test-frontend` → `build` → `e2e`, con `security` y `trace` en paralelo. Cada job llama a una sección de `scripts/verify.sh`; no dupliques lógica en el YAML.
 
 ```mermaid
 gitGraph
@@ -116,6 +118,7 @@ gitGraph
 ```bash
 scripts/verify.sh                  # puerta de calidad completa (requiere FORBIDDEN_WORD exportada)
 VERIFY_FAST=1 scripts/verify.sh    # lo que corre el pre-commit (sin builds ni npm audit)
+scripts/verify.sh lint typecheck   # solo algunas secciones (lint, typecheck, test-backend, test-frontend, build, security); cada etapa de la CI llama a una
 npx tsx scripts/trace.ts           # matriz criterios → tests (todas las specs)
 npx tsx scripts/trace.ts --spec 004
 npx tsx scripts/trace.ts --shipped # solo specs con tasks.md completo (lo usa la CI)
@@ -124,11 +127,13 @@ cd frontend && npm run test:cov
 cd backend && npm run db:migrate && npm run db:seed
 scripts/build-lambda.sh            # bundle de la Lambda en .build/ (poda peers y motores no usados)
 scripts/deploy.sh                  # despliegue completo con CloudFormation (requiere aws configure y backend/.env.production)
+scripts/smoke-test.sh <api> <web>  # /health + el front renderiza contra esa API (lo corre el CD tras desplegar)
 ```
 
 ## Lo que un agente NO debe hacer
 
 - Hacer push sin que se lo pidan.
+- Mergear un PR sin la revisión de la IA o con comentarios suyos sin atender.
 - Leer, imprimir o commitear `.env`.
 - Debilitar tests o umbrales de cobertura para que algo pase.
 - Agregar dependencias pesadas sin justificarlas en el PR.

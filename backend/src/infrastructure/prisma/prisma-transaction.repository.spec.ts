@@ -219,11 +219,12 @@ describe('PrismaTransactionRepository.applyResult', () => {
       tx.transaction.findUniqueOrThrow.mockResolvedValue(
         aRow({ status, failureReason: 'rejected' }),
       );
-      const t = await repo.applyResult(id, {
+      const { transaction: t, claimed } = await repo.applyResult(id, {
         status,
         gatewayTransactionId: null,
         failureReason: 'rejected',
       });
+      expect(claimed).toBe(true);
       expect(tx.transaction.updateMany).toHaveBeenCalledWith({
         where: { id, status: 'PENDING' },
         data: { status, failureReason: 'rejected' },
@@ -240,7 +241,8 @@ describe('PrismaTransactionRepository.applyResult', () => {
     tx.transaction.findUniqueOrThrow.mockResolvedValue(
       aRow({ status: 'APPROVED' }),
     );
-    const t = await repo.applyResult(id, approved);
+    const { transaction: t, claimed } = await repo.applyResult(id, approved);
+    expect(claimed).toBe(false);
     expect(tx.product.updateMany).not.toHaveBeenCalled();
     expect(tx.delivery.create).not.toHaveBeenCalled();
     expect(t.status).toBe('APPROVED');
@@ -259,8 +261,9 @@ describe('PrismaTransactionRepository.applyResult', () => {
       );
     tx.product.updateMany.mockResolvedValue({ count: 0 });
 
-    const t = await repo.applyResult(id, approved);
+    const { transaction: t, claimed } = await repo.applyResult(id, approved);
 
+    expect(claimed).toBe(true);
     expect(tx.transaction.update).toHaveBeenCalledWith({
       where: { id },
       data: { status: 'ERROR', failureReason: 'OUT_OF_STOCK_AFTER_PAYMENT' },

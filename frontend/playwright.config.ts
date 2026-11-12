@@ -31,7 +31,10 @@ export default defineConfig({
     { name: 'webkit', use: { ...devices['Desktop Safari'], ...mobile } },
   ],
   webServer: {
-    command: `npx vite build --logLevel warn && npx vite preview --port ${PORT} --strictPort`,
+    // CI's `e2e` stage reuses the bundle from the `build` stage (E2E_PREBUILT=1, in dist/).
+    command: process.env.E2E_PREBUILT
+      ? `npx vite preview --port ${PORT} --strictPort`
+      : `npx vite build --logLevel warn && npx vite preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     env: { VITE_API_URL: 'http://api.mock' },
     reuseExistingServer: !CI,

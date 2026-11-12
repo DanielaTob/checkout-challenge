@@ -12,7 +12,10 @@ import {
   type Transaction,
   type TransactionOutcome,
 } from '../../domain/transaction/transaction';
-import type { TransactionRepository } from '../../domain/transaction/transaction.repository';
+import type {
+  AppliedOutcome,
+  TransactionRepository,
+} from '../../domain/transaction/transaction.repository';
 import type {
   Delivery as DeliveryRow,
   Transaction as TransactionRow,
@@ -146,7 +149,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
   async applyResult(
     id: string,
     outcome: TransactionOutcome,
-  ): Promise<Transaction> {
+  ): Promise<AppliedOutcome> {
     return this.prisma.$transaction(async (tx) => {
       // Claim: only one caller can move the row out of PENDING (row lock + re-check).
       const claimed = await tx.transaction.updateMany({
@@ -187,9 +190,10 @@ export class PrismaTransactionRepository implements TransactionRepository {
           });
         }
       }
-      return toDomain(
+      const transaction = toDomain(
         await tx.transaction.findUniqueOrThrow({ where: { id }, include }),
       );
+      return { transaction, claimed: claimed.count === 1 };
     });
   }
 }
